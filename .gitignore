@@ -1,0 +1,49 @@
+
+# Dependencies
+**/node_modules/
+
+# Frontend build
+**/dist/
+**/build/
+**/.vite/
+**/*.tsbuildinfo
+
+# Environment variables and secrets
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Tests and coverage
+**/coverage/
+**/playwright-report/
+**/test-results/
+
+# Go backend
+**/vendor/
+*.exe
+*.test
+*.out
+coverage.out
+
+# IDE and OS files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Local temporary files
+*.tmp
+*.swp
+*.swo
