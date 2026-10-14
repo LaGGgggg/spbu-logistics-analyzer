@@ -23,6 +23,7 @@ export function MapView({ region }: MapViewProps) {
             zoom={DEFAULT_ZOOM}
             className='h-full w-full'
             worldCopyJump
+            attributionControl={false}
         >
             <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
