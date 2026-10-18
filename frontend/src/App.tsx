@@ -14,14 +14,18 @@ const TEST_REGION: MapRegion = {
 
 function App() {
   const [query, setQuery] = useState('')
+  const [error, setError] = useState<string | null>(null)
   const [region, setRegion] = useState<MapRegion | null>(null)
+  const [isLoading/*, setIsLoading*/] = useState(false)
 
   function handleSearch() {
     const cleanQuery = query.trim()
     if (cleanQuery === '') {
-      alert('Введите название региона')
+      setError('Введите название региона')
       return
     }
+
+    setError(null)
     setRegion(TEST_REGION)
   }
 
@@ -50,12 +54,22 @@ function App() {
                 className="h-10 rounded-none outline-none"
                 placeholder="Введите регион"
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(event) => {
+                  setQuery(event.target.value)
+                  setError(null)
+                }}
               />
-              <Button type="submit" className="h-10 px-4 rounded-none">
-                Найти
+              <Button 
+              type="submit" 
+              className="h-10 px-4 rounded-none"
+              disabled={isLoading}
+              >
+                {isLoading ? 'Поиск...' : 'Найти'}
               </Button>
             </div>
+            {error && (
+              <p className="text-sm text-destructive" role="alert"> {error}</p>
+            )}
           </form>
 
           {region && (
