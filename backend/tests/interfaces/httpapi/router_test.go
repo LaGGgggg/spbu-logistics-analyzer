@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/application/build"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/application/logistics_service"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/domain/logistics"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/interfaces/httpapi"
 	"github.com/gin-gonic/gin"
@@ -20,23 +20,23 @@ type queries struct {
 func (q *queries) Regions(context.Context) ([]logistics.Region, error) {
 	return []logistics.Region{}, nil
 }
-func (q *queries) RequestBuild(context.Context, string) (build.BuildResult, error) {
+func (q *queries) RequestBuild(context.Context, string) (logistics_service.BuildResult, error) {
 	q.calls++
-	return build.BuildResult{JobID: "job"}, nil
+	return logistics_service.BuildResult{JobID: "job"}, nil
 }
-func (q *queries) RequestAreaBuild(_ context.Context, b logistics.Bounds) (build.BuildResult, error) {
+func (q *queries) RequestAreaBuild(_ context.Context, b logistics.Bounds) (logistics_service.BuildResult, error) {
 	q.calls++
 	if q.areaErr != nil {
-		return build.BuildResult{}, q.areaErr
+		return logistics_service.BuildResult{}, q.areaErr
 	}
-	return build.BuildResult{JobID: "area-job", Region: &logistics.Region{ID: "area-test", Bounds: b}}, nil
+	return logistics_service.BuildResult{JobID: "area-job", Region: &logistics.Region{ID: "area-test", Bounds: b}}, nil
 }
-func (q *queries) GetJob(context.Context, string) (build.Job, error) {
-	return build.Job{}, build.ErrNotFound
+func (q *queries) GetJob(context.Context, string) (logistics_service.Job, error) {
+	return logistics_service.Job{}, logistics_service.ErrNotFound
 }
 func (q *queries) GetGraph(_ context.Context, id string) (logistics.LogisticsGraph, error) {
 	if id == "missing" {
-		return logistics.LogisticsGraph{}, build.ErrNotFound
+		return logistics.LogisticsGraph{}, logistics_service.ErrNotFound
 	}
 	return logistics.LogisticsGraph{ID: id, Nodes: []logistics.LogisticsNode{{ID: "n", Modes: []logistics.TransportMode{logistics.TransportRoad}}, {ID: "port", Modes: []logistics.TransportMode{logistics.TransportSea}}}}, nil
 }
@@ -81,7 +81,7 @@ func TestAPIValidationAndExports(t *testing.T) {
 
 func TestAreaWithoutSourceReturns422(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := httpapi.NewRouter(&queries{areaErr: build.ErrAreaUnavailable})
+	router := httpapi.NewRouter(&queries{areaErr: logistics_service.ErrAreaUnavailable})
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, httptest.NewRequest("POST", "/api/graphs", strings.NewReader(`{"bounds":{"west":1,"south":1,"east":2,"north":2}}`)))
 	if response.Code != 422 {

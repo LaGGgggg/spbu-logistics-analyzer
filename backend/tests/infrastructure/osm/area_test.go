@@ -10,9 +10,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/application/build"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/application/logistics_service"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/domain/logistics"
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/infrastructure/osm"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/repository/osm"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/tests/testutil"
 )
 
@@ -25,7 +25,7 @@ func TestAreaSelectsSmallestCoveringSource(t *testing.T) {
 		t.Fatalf("source=%+v %v", r, err)
 	}
 	outside := logistics.Bounds{West: 1, South: 1, East: 2, North: 2}
-	if _, err := s.ResolveArea(context.Background(), outside); !errors.Is(err, build.ErrAreaUnavailable) {
+	if _, err := s.ResolveArea(context.Background(), outside); !errors.Is(err, logistics_service.ErrAreaUnavailable) {
 		t.Fatalf("outside coverage: %v", err)
 	}
 	s.Catalog.OverpassURL = "http://example.invalid"

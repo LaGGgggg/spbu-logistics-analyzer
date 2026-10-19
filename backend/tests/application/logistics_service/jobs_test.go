@@ -1,4 +1,4 @@
-package build_test
+package logistics_service_test
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/application/build"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/application/logistics_service"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/domain/logistics"
 )
 
@@ -17,7 +17,7 @@ func (f builderFunc) Build(ctx context.Context, r logistics.Region) (logistics.L
 }
 
 type outcomeRepository struct {
-	build.Repository
+	logistics_service.Repository
 	outcome        string
 	saveErr        error
 	saveContextErr error
@@ -25,15 +25,15 @@ type outcomeRepository struct {
 	claimed        bool
 }
 
-func (r *outcomeRepository) Claim(ctx context.Context) (build.Job, logistics.Region, error) {
+func (r *outcomeRepository) Claim(ctx context.Context) (logistics_service.Job, logistics.Region, error) {
 	if err := ctx.Err(); err != nil {
-		return build.Job{}, logistics.Region{}, err
+		return logistics_service.Job{}, logistics.Region{}, err
 	}
 	if r.claimed {
-		return build.Job{}, logistics.Region{}, build.ErrNotFound
+		return logistics_service.Job{}, logistics.Region{}, logistics_service.ErrNotFound
 	}
 	r.claimed = true
-	return build.Job{ID: "job", RegionID: "r"}, logistics.Region{ID: "r"}, nil
+	return logistics_service.Job{ID: "job", RegionID: "r"}, logistics.Region{ID: "r"}, nil
 }
 func (r *outcomeRepository) persist(ctx context.Context, outcome string) error {
 	r.outcome = outcome
@@ -41,7 +41,7 @@ func (r *outcomeRepository) persist(ctx context.Context, outcome string) error {
 	r.cancel()
 	return r.saveErr
 }
-func (r *outcomeRepository) Complete(ctx context.Context, _ build.Job, _ logistics.LogisticsGraph) error {
+func (r *outcomeRepository) Complete(ctx context.Context, _ logistics_service.Job, _ logistics.LogisticsGraph) error {
 	return r.persist(ctx, "complete")
 }
 func (r *outcomeRepository) Fail(ctx context.Context, _, _ string) error {
@@ -83,7 +83,7 @@ func TestWorkerPersistsOutcome(t *testing.T) {
 				}
 				return tc.builder(buildCtx, region)
 			})
-			manager := build.Manager{Repository: repo, Builder: builder, Workers: 1, PollInterval: time.Millisecond, BuildTimeout: time.Second}
+			manager := logistics_service.WorkerService{Repository: repo, Builder: builder, Workers: 1, PollInterval: time.Millisecond, BuildTimeout: time.Second}
 			err := manager.Run(ctx)
 			if repo.outcome != tc.want {
 				t.Fatalf("outcome=%s want=%s", repo.outcome, tc.want)

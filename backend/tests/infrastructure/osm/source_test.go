@@ -14,7 +14,7 @@ import (
 	"testing"
 
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/domain/logistics"
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/infrastructure/osm"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/repository/osm"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/tests/testutil"
 )
 

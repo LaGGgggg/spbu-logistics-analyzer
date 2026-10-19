@@ -7,18 +7,18 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/application/build"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/application/logistics_service"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/domain/logistics"
 )
 
 const overpassSource = "@overpass"
 
-func (s Source) ResolveArea(ctx context.Context, b logistics.Bounds) (build.AreaSource, error) {
+func (s Source) ResolveArea(ctx context.Context, b logistics.Bounds) (logistics_service.AreaSource, error) {
 	if err := ctx.Err(); err != nil {
-		return build.AreaSource{}, err
+		return logistics_service.AreaSource{}, err
 	}
 	if err := b.Validate(); err != nil {
-		return build.AreaSource{}, fmt.Errorf("%w: %v", build.ErrInvalidInput, err)
+		return logistics_service.AreaSource{}, fmt.Errorf("%w: %v", logistics_service.ErrInvalidInput, err)
 	}
 	keys := []string{}
 	for id, f := range s.Catalog.Regions {
@@ -38,7 +38,7 @@ func (s Source) ResolveArea(ctx context.Context, b logistics.Bounds) (build.Area
 	if len(keys) > 0 {
 		id = keys[0]
 	} else if s.Catalog.OverpassURL == "" {
-		return build.AreaSource{}, build.ErrAreaUnavailable
+		return logistics_service.AreaSource{}, logistics_service.ErrAreaUnavailable
 	}
 	version, _ := json.Marshal(struct {
 		Files     Files
@@ -46,5 +46,5 @@ func (s Source) ResolveArea(ctx context.Context, b logistics.Bounds) (build.Area
 		URL       string
 		Algorithm string
 	}{s.Catalog.Regions[id], s.Catalog.Policy, s.Catalog.OverpassURL, "area-v1"})
-	return build.AreaSource{ID: id, Version: fmt.Sprintf("%x", sha256.Sum256(version))}, nil
+	return logistics_service.AreaSource{ID: id, Version: fmt.Sprintf("%x", sha256.Sum256(version))}, nil
 }

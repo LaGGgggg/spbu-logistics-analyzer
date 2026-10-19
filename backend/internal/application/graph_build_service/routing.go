@@ -1,4 +1,4 @@
-package network
+package graph_build_service
 
 import (
 	"container/heap"

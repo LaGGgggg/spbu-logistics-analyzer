@@ -1,4 +1,4 @@
-package build
+package logistics_service
 
 import (
 	"context"
@@ -8,53 +8,21 @@ import (
 	"sync"
 	"time"
 
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/application/network"
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/domain/buildjob"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/application/graph_build_service"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/domain/logistics"
 )
 
-var ErrNotFound = errors.New("not found")
-
-type Status = buildjob.Status
-
-const (
-	Pending    = buildjob.Pending
-	Processing = buildjob.Processing
-	Completed  = buildjob.Completed
-	Failed     = buildjob.Failed
-)
-
-type Job = buildjob.Job
-
-type BuildResult struct {
-	Region  *logistics.Region `json:"region,omitempty"`
-	JobID   string            `json:"job_id,omitempty"`
-	GraphID string            `json:"graph_id,omitempty"`
-}
-
-type Repository interface {
-	Regions(context.Context) ([]logistics.Region, error)
-	RequestBuild(context.Context, string) (BuildResult, error)
-	RequestAreaBuild(context.Context, logistics.Region) (BuildResult, error)
-	GetJob(context.Context, string) (Job, error)
-	GetGraph(context.Context, string) (logistics.LogisticsGraph, error)
-	Claim(context.Context) (Job, logistics.Region, error)
-	Complete(context.Context, Job, logistics.LogisticsGraph) error
-	Fail(context.Context, string, string) error
-	Requeue(context.Context, string) error
-}
-
-type Manager struct {
+type WorkerService struct {
 	Repository   Repository
-	Builder      network.Builder
+	Builder      graph_build_service.Builder
 	Workers      int
 	PollInterval time.Duration
 	BuildTimeout time.Duration
 }
 
-func (m *Manager) Run(ctx context.Context) error {
+func (m *WorkerService) Run(ctx context.Context) error {
 	if m.Workers < 1 || m.PollInterval <= 0 || m.BuildTimeout <= 0 || m.Repository == nil || m.Builder == nil {
-		return fmt.Errorf("invalid job manager configuration")
+		return fmt.Errorf("invalid build worker service configuration")
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -97,7 +65,7 @@ func (m *Manager) Run(ctx context.Context) error {
 	}
 }
 
-func (m *Manager) execute(ctx context.Context, job Job, region logistics.Region) error {
+func (m *WorkerService) execute(ctx context.Context, job Job, region logistics.Region) error {
 	buildCtx, cancel := context.WithTimeout(ctx, m.BuildTimeout)
 	defer cancel()
 	result, err := safeBuild(buildCtx, m.Builder, region)
@@ -128,7 +96,7 @@ func (m *Manager) execute(ctx context.Context, job Job, region logistics.Region)
 	return nil
 }
 
-func safeBuild(ctx context.Context, builder network.Builder, region logistics.Region) (result logistics.LogisticsGraph, err error) {
+func safeBuild(ctx context.Context, builder graph_build_service.Builder, region logistics.Region) (result logistics.LogisticsGraph, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			err = fmt.Errorf("builder panic: %v", recovered)

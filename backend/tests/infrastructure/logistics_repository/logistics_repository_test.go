@@ -1,4 +1,4 @@
-package postgres_test
+package logistics_repository_test
 
 import (
 	"context"
@@ -10,17 +10,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/application/build"
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/application/network"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/application/graph_build_service"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/application/logistics_service"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/domain/logistics"
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/infrastructure/osm"
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/infrastructure/postgres"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/repository/logistics_repository"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/repository/osm"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/tests/testutil"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func TestPostgresBuildLifecycle(t *testing.T) {
+func TestLogisticsRepositoryBuildLifecycle(t *testing.T) {
 	url := os.Getenv("TEST_DATABASE_URL")
 	if url == "" {
 		t.Skip("set TEST_DATABASE_URL to run PostgreSQL integration")
@@ -48,7 +48,7 @@ func TestPostgresBuildLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer pool.Close()
-	repo := &postgres.Postgres{Pool: pool}
+	repo := logistics_repository.New(pool)
 	region := logistics.Region{ID: "test", Name: "Test", Bounds: logistics.Bounds{West: 29, South: 59, East: 31, North: 61}}
 	second := region
 	second.ID = "second"
@@ -65,8 +65,8 @@ func TestPostgresBuildLifecycle(t *testing.T) {
 		unlock()
 		t.Fatal("second server obtained exclusive worker lock")
 	}
-	service := build.NewService(repo)
-	results := make(chan build.BuildResult, 16)
+	service := logistics_service.NewService(repo)
+	results := make(chan logistics_service.BuildResult, 16)
 	failures := make(chan error, 16)
 	var wg sync.WaitGroup
 	for range 16 {
@@ -94,17 +94,17 @@ func TestPostgresBuildLifecycle(t *testing.T) {
 			t.Fatalf("request was not deduplicated: %+v", r)
 		}
 	}
-	if _, err := service.RequestBuild(ctx, "unknown"); !errors.Is(err, build.ErrNotFound) {
+	if _, err := service.RequestBuild(ctx, "unknown"); !errors.Is(err, logistics_service.ErrNotFound) {
 		t.Fatalf("unknown region: %v", err)
 	}
 	root := testutil.FixtureDir(t)
-	pipeline := network.Pipeline{Policy: logistics.DefaultFreightPolicy(), Source: osmdata.Source{Catalog: osmdata.Catalog{MaximumObjects: 1000, Regions: map[string]osmdata.Files{"test": {OSM: filepath.Join(root, "freight.osm"), References: filepath.Join(root, "references.json")}}}}}
-	manager := build.Manager{Repository: repo, Builder: pipeline, Workers: 2, PollInterval: time.Millisecond * 10, BuildTimeout: time.Second * 5}
+	pipeline := graph_build_service.Service{Policy: logistics.DefaultFreightPolicy(), Source: osmdata.Source{Catalog: osmdata.Catalog{MaximumObjects: 1000, Regions: map[string]osmdata.Files{"test": {OSM: filepath.Join(root, "freight.osm"), References: filepath.Join(root, "references.json")}}}}}
+	manager := logistics_service.WorkerService{Repository: repo, Builder: pipeline, Workers: 2, PollInterval: time.Millisecond * 10, BuildTimeout: time.Second * 5}
 	workerCtx, stop := context.WithCancel(ctx)
 	done := make(chan error, 1)
 	go func() { done <- manager.Run(workerCtx) }()
 	defer stop()
-	var job build.Job
+	var job logistics_service.Job
 	ticker := time.NewTicker(10 * time.Millisecond)
 	defer ticker.Stop()
 	for {
@@ -112,10 +112,10 @@ func TestPostgresBuildLifecycle(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if job.Status == build.Completed {
+		if job.Status == logistics_service.Completed {
 			break
 		}
-		if job.Status == build.Failed {
+		if job.Status == logistics_service.Failed {
 			t.Fatalf("build failed: %+v", job)
 		}
 		select {
@@ -144,9 +144,9 @@ func TestPostgresBuildLifecycle(t *testing.T) {
 	files := source.Catalog.Regions["test"]
 	files.Bounds = &region.Bounds
 	source.Catalog.Regions["test"] = files
-	areaService := build.NewService(repo, source)
+	areaService := logistics_service.NewService(repo, source)
 	areaBounds := logistics.Bounds{West: 29.9, South: 59.9, East: 30.1, North: 60.1}
-	areaResults := make(chan build.BuildResult, 8)
+	areaResults := make(chan logistics_service.BuildResult, 8)
 	areaFailures := make(chan error, 8)
 	for range 8 {
 		wg.Go(func() {
@@ -195,10 +195,10 @@ func TestPostgresBuildLifecycle(t *testing.T) {
 				areaStop()
 				t.Fatal(err)
 			}
-			if job.Status == build.Completed {
+			if job.Status == logistics_service.Completed {
 				break
 			}
-			if job.Status == build.Failed {
+			if job.Status == logistics_service.Failed {
 				areaStop()
 				t.Fatalf("area failed: %+v", job)
 			}
@@ -226,7 +226,7 @@ func TestPostgresBuildLifecycle(t *testing.T) {
 	if err != nil || claimed.ID != result.JobID {
 		t.Fatalf("claim=%+v err=%v", claimed, err)
 	}
-	if _, _, err := repo.Claim(ctx); !errors.Is(err, build.ErrNotFound) {
+	if _, _, err := repo.Claim(ctx); !errors.Is(err, logistics_service.ErrNotFound) {
 		t.Fatalf("claimed same job twice: %v", err)
 	}
 	release()
@@ -236,7 +236,7 @@ func TestPostgresBuildLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	recovered, err := repo.GetJob(ctx, result.JobID)
-	if err != nil || recovered.Status != build.Pending {
+	if err != nil || recovered.Status != logistics_service.Pending {
 		t.Fatalf("restart did not recover job: %+v %v", recovered, err)
 	}
 	claimed, _, err = repo.Claim(ctx)

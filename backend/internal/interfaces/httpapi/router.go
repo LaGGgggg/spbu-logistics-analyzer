@@ -10,20 +10,20 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/application/build"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/application/logistics_service"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/domain/logistics"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/interfaces/export"
 	"github.com/gin-gonic/gin"
 )
 
-func NewRouter(repository build.Queries) *gin.Engine {
+func NewRouter(service logistics_service.Queries) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Logger(), gin.Recovery())
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "healthy", "service": "Logistics Network API"})
 	})
 	router.GET("/api/regions", func(c *gin.Context) {
-		regions, err := repository.Regions(c.Request.Context())
+		regions, err := service.Regions(c.Request.Context())
 		if err != nil {
 			respondError(c, err)
 			return
@@ -51,7 +51,7 @@ func NewRouter(repository build.Queries) *gin.Engine {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Укажите только region_id или bounds с четырьмя координатами."})
 			return
 		}
-		var result build.BuildResult
+		var result logistics_service.BuildResult
 		var err error
 		if request.Bounds != nil {
 			b := request.Bounds
@@ -64,14 +64,14 @@ func NewRouter(repository build.Queries) *gin.Engine {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректные границы: долгота от −180 до 180, широта от −90 до 90; west < east, south < north."})
 				return
 			}
-			result, err = repository.RequestAreaBuild(c.Request.Context(), bounds)
+			result, err = service.RequestAreaBuild(c.Request.Context(), bounds)
 		} else {
 			id := *request.RegionID
 			if id == "" || len(id) > 128 || strings.TrimSpace(id) != id {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный region_id."})
 				return
 			}
-			result, err = repository.RequestBuild(c.Request.Context(), id)
+			result, err = service.RequestBuild(c.Request.Context(), id)
 		}
 		if err != nil {
 			respondError(c, err)
@@ -84,7 +84,7 @@ func NewRouter(repository build.Queries) *gin.Engine {
 		}
 	})
 	router.GET("/api/jobs/:id", func(c *gin.Context) {
-		job, err := repository.GetJob(c.Request.Context(), c.Param("id"))
+		job, err := service.GetJob(c.Request.Context(), c.Param("id"))
 		if err != nil {
 			respondError(c, err)
 			return
@@ -92,7 +92,7 @@ func NewRouter(repository build.Queries) *gin.Engine {
 		c.JSON(http.StatusOK, job)
 	})
 	router.GET("/api/graphs/:id", func(c *gin.Context) {
-		graph, err := repository.GetGraph(c.Request.Context(), c.Param("id"))
+		graph, err := service.GetGraph(c.Request.Context(), c.Param("id"))
 		if err != nil {
 			respondError(c, err)
 			return
@@ -121,7 +121,7 @@ func NewRouter(repository build.Queries) *gin.Engine {
 		c.JSON(http.StatusOK, graph)
 	})
 	router.GET("/api/graphs/:id/coverage", func(c *gin.Context) {
-		graph, err := repository.GetGraph(c.Request.Context(), c.Param("id"))
+		graph, err := service.GetGraph(c.Request.Context(), c.Param("id"))
 		if err != nil {
 			respondError(c, err)
 			return
@@ -134,7 +134,7 @@ func NewRouter(repository build.Queries) *gin.Engine {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Неизвестный формат экспорта.", "formats": export.Formats})
 			return
 		}
-		graph, err := repository.GetGraph(c.Request.Context(), c.Param("id"))
+		graph, err := service.GetGraph(c.Request.Context(), c.Param("id"))
 		if err != nil {
 			respondError(c, err)
 			return
@@ -154,15 +154,15 @@ func NewRouter(repository build.Queries) *gin.Engine {
 }
 
 func respondError(c *gin.Context, err error) {
-	if errors.Is(err, build.ErrAreaUnavailable) {
+	if errors.Is(err, logistics_service.ErrAreaUnavailable) {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "Для этой области нет источника данных. Настройте покрывающую выгрузку OSM или Overpass."})
 		return
 	}
-	if errors.Is(err, build.ErrInvalidInput) {
+	if errors.Is(err, logistics_service.ErrInvalidInput) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный идентификатор."})
 		return
 	}
-	if errors.Is(err, build.ErrNotFound) {
+	if errors.Is(err, logistics_service.ErrNotFound) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Регион, задача или граф не найдены."})
 		return
 	}

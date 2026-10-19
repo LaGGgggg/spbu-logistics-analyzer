@@ -1,33 +1,33 @@
-package build_test
+package logistics_service_test
 
 import (
 	"context"
 	"errors"
 	"testing"
 
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/application/build"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/application/logistics_service"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/domain/logistics"
 )
 
 type areaRepository struct {
-	build.Repository
+	logistics_service.Repository
 	last logistics.Region
 }
 
-func (r *areaRepository) RequestAreaBuild(_ context.Context, region logistics.Region) (build.BuildResult, error) {
+func (r *areaRepository) RequestAreaBuild(_ context.Context, region logistics.Region) (logistics_service.BuildResult, error) {
 	r.last = region
-	return build.BuildResult{JobID: "job"}, nil
+	return logistics_service.BuildResult{JobID: "job"}, nil
 }
 
 type areaResolver struct{ version string }
 
-func (r *areaResolver) ResolveArea(context.Context, logistics.Bounds) (build.AreaSource, error) {
-	return build.AreaSource{ID: "source", Version: r.version}, nil
+func (r *areaResolver) ResolveArea(context.Context, logistics.Bounds) (logistics_service.AreaSource, error) {
+	return logistics_service.AreaSource{ID: "source", Version: r.version}, nil
 }
 func TestAreaIdentityIncludesBoundsAndSource(t *testing.T) {
 	repo := &areaRepository{}
 	resolver := &areaResolver{version: "v1"}
-	s := build.NewService(repo, resolver)
+	s := logistics_service.NewService(repo, resolver)
 	bounds := logistics.Bounds{West: 29, South: 59, East: 31, North: 61}
 	first, err := s.RequestAreaBuild(context.Background(), bounds)
 	if err != nil {
@@ -56,10 +56,10 @@ func TestAreaIdentityIncludesBoundsAndSource(t *testing.T) {
 	if updated.Region.ID == other.Region.ID {
 		t.Fatal("source versions share cache identity")
 	}
-	if _, err := s.RequestAreaBuild(context.Background(), logistics.Bounds{}); !errors.Is(err, build.ErrInvalidInput) {
+	if _, err := s.RequestAreaBuild(context.Background(), logistics.Bounds{}); !errors.Is(err, logistics_service.ErrInvalidInput) {
 		t.Fatalf("invalid bounds: %v", err)
 	}
-	if _, err := build.NewService(repo).RequestAreaBuild(context.Background(), bounds); !errors.Is(err, build.ErrAreaUnavailable) {
+	if _, err := logistics_service.NewService(repo).RequestAreaBuild(context.Background(), bounds); !errors.Is(err, logistics_service.ErrAreaUnavailable) {
 		t.Fatalf("missing resolver: %v", err)
 	}
 }

@@ -1,24 +1,13 @@
-package build
+package logistics_service
 
 import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/domain/logistics"
 )
-
-var ErrAreaUnavailable = errors.New("no data source covers this area")
-
-type AreaSource struct {
-	ID      string
-	Version string
-}
-type AreaResolver interface {
-	ResolveArea(context.Context, logistics.Bounds) (AreaSource, error)
-}
 
 func (s *Service) RequestAreaBuild(ctx context.Context, bounds logistics.Bounds) (BuildResult, error) {
 
