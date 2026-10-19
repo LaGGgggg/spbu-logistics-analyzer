@@ -13,13 +13,23 @@ var ErrInvalidInput = errors.New("invalid input")
 type Queries interface {
 	Regions(context.Context) ([]logistics.Region, error)
 	RequestBuild(context.Context, string) (BuildResult, error)
+	RequestAreaBuild(context.Context, logistics.Bounds) (BuildResult, error)
 	GetJob(context.Context, string) (Job, error)
 	GetGraph(context.Context, string) (logistics.LogisticsGraph, error)
 }
-type Service struct{ repository Repository }
+type Service struct {
+	repository Repository
+	areas      AreaResolver
+}
 
-func NewService(repository Repository) *Service { return &Service{repository: repository} }
-func validID(id string) bool                    { return len(id) > 0 && len(id) <= 128 && strings.TrimSpace(id) == id }
+func NewService(repository Repository, resolvers ...AreaResolver) *Service {
+	s := &Service{repository: repository}
+	if len(resolvers) > 0 {
+		s.areas = resolvers[0]
+	}
+	return s
+}
+func validID(id string) bool { return len(id) > 0 && len(id) <= 128 && strings.TrimSpace(id) == id }
 func (s *Service) Regions(ctx context.Context) ([]logistics.Region, error) {
 	return s.repository.Regions(ctx)
 }

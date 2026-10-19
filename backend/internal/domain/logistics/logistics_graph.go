@@ -6,6 +6,7 @@ import (
 )
 
 type LogisticsGraph struct {
+	Bounds   *Bounds         `json:"bounds,omitempty"`
 	Coverage Coverage        `json:"coverage"`
 	ID       string          `json:"id"`
 	RegionID string          `json:"region_id"`
@@ -14,6 +15,11 @@ type LogisticsGraph struct {
 }
 
 func (g LogisticsGraph) Validate() error {
+	if g.Bounds != nil {
+		if err := g.Bounds.Validate(); err != nil {
+			return err
+		}
+	}
 	if err := validateText("graph ID", g.ID); err != nil {
 		return err
 	}

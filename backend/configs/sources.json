@@ -1,10 +1,21 @@
 {
   "maximum_objects": 5000000,
-  "policy": {"minimum_warehouse_area_m2": 10000, "maximum_snap_km": 0.5},
+  "policy": {
+    "minimum_warehouse_area_m2": 10000,
+    "maximum_snap_km": 0.5
+  },
   "regions": {
     "spb-leningrad": {
       "osm": "../var/extracts/northwestern-fed-district-latest.osm.pbf",
-      "url": "https://download.geofabrik.de/russia/northwestern-fed-district-latest.osm.pbf"
+      "url": "https://download.geofabrik.de/russia/northwestern-fed-district-latest.osm.pbf",
+      "bounds": {
+        "west": 27.4,
+        "south": 58.4,
+        "east": 35.7,
+        "north": 61.4
+      }
     }
-  }
+  },
+  "overpass_url": "https://overpass-api.de/api/interpreter",
+  "cache_directory": "../var/areas"
 }

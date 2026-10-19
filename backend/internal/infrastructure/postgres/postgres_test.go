@@ -138,6 +138,85 @@ func TestPostgresBuildLifecycle(t *testing.T) {
 	if err != nil || cached.GraphID != job.GraphID || cached.JobID != "" {
 		t.Fatalf("cache=%+v error=%v", cached, err)
 	}
+	// Arbitrary areas are immutable, deduplicated and excluded from presets.
+	source := pipeline.Source.(osmdata.Source)
+	files := source.Catalog.Regions["test"]
+	files.Bounds = &region.Bounds
+	source.Catalog.Regions["test"] = files
+	areaService := build.NewService(repo, source)
+	areaBounds := logistics.Bounds{West: 29.9, South: 59.9, East: 30.1, North: 60.1}
+	areaResults := make(chan build.BuildResult, 8)
+	areaFailures := make(chan error, 8)
+	for range 8 {
+		wg.Go(func() {
+			result, err := areaService.RequestAreaBuild(ctx, areaBounds)
+			if err != nil {
+				areaFailures <- err
+				return
+			}
+			areaResults <- result
+		})
+	}
+	wg.Wait()
+	close(areaResults)
+	close(areaFailures)
+	for err := range areaFailures {
+		t.Fatal(err)
+	}
+	areaJob := ""
+	for result := range areaResults {
+		if areaJob == "" {
+			areaJob = result.JobID
+		}
+		if result.JobID != areaJob || result.Region.Bounds != areaBounds {
+			t.Fatalf("area not deduplicated: %+v", result)
+		}
+	}
+	areaBounds.East = 30.2
+	otherArea, err := areaService.RequestAreaBuild(ctx, areaBounds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if otherArea.JobID == areaJob {
+		t.Fatal("different areas share task")
+	}
+	presets, err := repo.Regions(ctx)
+	if err != nil || len(presets) != 2 {
+		t.Fatalf("generated areas leaked into presets: %v %v", presets, err)
+	}
+	areaCtx, areaStop := context.WithCancel(ctx)
+	areaDone := make(chan error, 1)
+	go func() { areaDone <- manager.Run(areaCtx) }()
+	for _, jobID := range []string{areaJob, otherArea.JobID} {
+		for {
+			job, err := service.GetJob(ctx, jobID)
+			if err != nil {
+				areaStop()
+				t.Fatal(err)
+			}
+			if job.Status == build.Completed {
+				break
+			}
+			if job.Status == build.Failed {
+				areaStop()
+				t.Fatalf("area failed: %+v", job)
+			}
+			select {
+			case <-ctx.Done():
+				areaStop()
+				t.Fatal(ctx.Err())
+			case <-ticker.C:
+			}
+		}
+	}
+	areaStop()
+	if err := <-areaDone; err != nil {
+		t.Fatal(err)
+	}
+	cachedArea, err := areaService.RequestAreaBuild(ctx, areaBounds)
+	if err != nil || cachedArea.GraphID == "" {
+		t.Fatalf("area cache: %+v %v", cachedArea, err)
+	}
 	result, err := service.RequestBuild(ctx, "second")
 	if err != nil {
 		t.Fatal(err)

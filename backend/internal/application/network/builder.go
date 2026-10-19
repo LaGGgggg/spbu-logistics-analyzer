@@ -36,7 +36,7 @@ func (p Pipeline) Build(ctx context.Context, region logistics.Region) (logistics
 	if err != nil {
 		return logistics.LogisticsGraph{}, err
 	}
-	g := logistics.LogisticsGraph{ID: rand.Text(), RegionID: region.ID, Nodes: []logistics.LogisticsNode{}, Edges: []logistics.LogisticsEdge{}}
+	g := logistics.LogisticsGraph{Bounds: &region.Bounds, ID: rand.Text(), RegionID: region.ID, Nodes: []logistics.LogisticsNode{}, Edges: []logistics.LogisticsEdge{}}
 	g.Coverage = logistics.Coverage{Sources: dataset.Sources, Warnings: dataset.Warnings, UnmatchedReferenceIDs: []string{}, UnroutedNodeModes: []string{}}
 	byID := map[string]int{}
 	for _, f := range dataset.Features {

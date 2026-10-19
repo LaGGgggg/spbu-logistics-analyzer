@@ -27,13 +27,15 @@ const (
 type Job = buildjob.Job
 
 type BuildResult struct {
-	JobID   string `json:"job_id,omitempty"`
-	GraphID string `json:"graph_id,omitempty"`
+	Region  *logistics.Region `json:"region,omitempty"`
+	JobID   string            `json:"job_id,omitempty"`
+	GraphID string            `json:"graph_id,omitempty"`
 }
 
 type Repository interface {
 	Regions(context.Context) ([]logistics.Region, error)
 	RequestBuild(context.Context, string) (BuildResult, error)
+	RequestAreaBuild(context.Context, logistics.Region) (BuildResult, error)
 	GetJob(context.Context, string) (Job, error)
 	GetGraph(context.Context, string) (logistics.LogisticsGraph, error)
 	Claim(context.Context) (Job, logistics.Region, error)
