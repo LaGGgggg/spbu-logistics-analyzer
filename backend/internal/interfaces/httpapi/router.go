@@ -35,17 +35,44 @@ func NewRouter(repository build.Queries) *gin.Engine {
 		decoder := json.NewDecoder(c.Request.Body)
 		decoder.DisallowUnknownFields()
 		var request struct {
-			RegionID string `json:"region_id"`
+			RegionID *string `json:"region_id"`
+			Bounds   *struct {
+				West  *float64 `json:"west"`
+				South *float64 `json:"south"`
+				East  *float64 `json:"east"`
+				North *float64 `json:"north"`
+			} `json:"bounds"`
 		}
 		if err := decoder.Decode(&request); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Ожидается JSON с region_id."})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Ожидается JSON с region_id или bounds."})
 			return
 		}
-		if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) || request.RegionID == "" || len(request.RegionID) > 128 || strings.TrimSpace(request.RegionID) != request.RegionID {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный region_id или тело запроса."})
+		if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) || (request.RegionID == nil) == (request.Bounds == nil) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Укажите только region_id или bounds с четырьмя координатами."})
 			return
 		}
-		result, err := repository.RequestBuild(c.Request.Context(), request.RegionID)
+		var result build.BuildResult
+		var err error
+		if request.Bounds != nil {
+			b := request.Bounds
+			if b.West == nil || b.South == nil || b.East == nil || b.North == nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Укажите west, south, east и north."})
+				return
+			}
+			bounds := logistics.Bounds{West: *b.West, South: *b.South, East: *b.East, North: *b.North}
+			if err := bounds.Validate(); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректные границы: долгота от −180 до 180, широта от −90 до 90; west < east, south < north."})
+				return
+			}
+			result, err = repository.RequestAreaBuild(c.Request.Context(), bounds)
+		} else {
+			id := *request.RegionID
+			if id == "" || len(id) > 128 || strings.TrimSpace(id) != id {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный region_id."})
+				return
+			}
+			result, err = repository.RequestBuild(c.Request.Context(), id)
+		}
 		if err != nil {
 			respondError(c, err)
 			return
@@ -127,6 +154,10 @@ func NewRouter(repository build.Queries) *gin.Engine {
 }
 
 func respondError(c *gin.Context, err error) {
+	if errors.Is(err, build.ErrAreaUnavailable) {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "Для этой области нет источника данных. Настройте покрывающую выгрузку OSM или Overpass."})
+		return
+	}
 	if errors.Is(err, build.ErrInvalidInput) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный идентификатор."})
 		return

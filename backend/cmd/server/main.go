@@ -62,10 +62,11 @@ func run() error {
 		return err
 	}
 	defer release()
-	manager := &build.Manager{Repository: repository, Builder: network.Pipeline{Source: osmdata.Source{Catalog: catalog}, Policy: catalog.Policy}, Workers: cfg.Workers, PollInterval: time.Second, BuildTimeout: cfg.BuildTimeout}
+	source := osmdata.Source{Catalog: catalog}
+	manager := &build.Manager{Repository: repository, Builder: network.Pipeline{Source: source, Policy: catalog.Policy}, Workers: cfg.Workers, PollInterval: time.Second, BuildTimeout: cfg.BuildTimeout}
 	workerDone := make(chan error, 1)
 	go func() { workerDone <- manager.Run(ctx) }()
-	server := &http.Server{Addr: cfg.HTTPAddr, Handler: httpapi.NewRouter(build.NewService(repository)), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: time.Minute}
+	server := &http.Server{Addr: cfg.HTTPAddr, Handler: httpapi.NewRouter(build.NewService(repository, source)), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: time.Minute}
 	serverDone := make(chan error, 1)
 	go func() { serverDone <- server.ListenAndServe() }()
 	slog.Info("HTTP server started", "address", cfg.HTTPAddr, "workers", cfg.Workers)

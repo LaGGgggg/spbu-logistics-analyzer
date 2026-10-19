@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,13 +13,16 @@ import (
 )
 
 type Files struct {
-	OSM        string `json:"osm"`
-	URL        string `json:"url,omitempty"`
-	SHA256     string `json:"sha256,omitempty"`
-	References string `json:"references,omitempty"`
-	Routes     string `json:"routes,omitempty"`
+	Bounds     *logistics.Bounds `json:"bounds,omitempty"`
+	OSM        string            `json:"osm"`
+	URL        string            `json:"url,omitempty"`
+	SHA256     string            `json:"sha256,omitempty"`
+	References string            `json:"references,omitempty"`
+	Routes     string            `json:"routes,omitempty"`
 }
 type Catalog struct {
+	OverpassURL    string                  `json:"overpass_url,omitempty"`
+	CacheDirectory string                  `json:"cache_directory,omitempty"`
 	Regions        map[string]Files        `json:"regions"`
 	Policy         logistics.FreightPolicy `json:"policy"`
 	MaximumObjects int                     `json:"maximum_objects"`
@@ -26,7 +30,7 @@ type Catalog struct {
 type Source struct{ Catalog Catalog }
 
 func LoadCatalog(path string) (Catalog, error) {
-	c := Catalog{Policy: logistics.DefaultFreightPolicy(), MaximumObjects: 5000000}
+	c := Catalog{Policy: logistics.DefaultFreightPolicy(), MaximumObjects: 5000000, CacheDirectory: "../var/areas"}
 	f, err := os.Open(path)
 	if err != nil {
 		return c, err
@@ -43,10 +47,30 @@ func LoadCatalog(path string) (Catalog, error) {
 	if c.MaximumObjects < 1 {
 		return c, fmt.Errorf("maximum_objects must be positive")
 	}
-	if len(c.Regions) == 0 {
+	if len(c.Regions) == 0 && c.OverpassURL == "" {
 		return c, fmt.Errorf("source catalog has no regions")
 	}
+	if c.OverpassURL != "" {
+		endpoint, err := url.Parse(c.OverpassURL)
+		if err != nil || (endpoint.Scheme != "http" && endpoint.Scheme != "https") || endpoint.Host == "" {
+			return c, fmt.Errorf("overpass_url must be an HTTP(S) endpoint")
+		}
+		if c.CacheDirectory == "" {
+			return c, fmt.Errorf("cache_directory is required for overpass")
+		}
+	}
+	if !filepath.IsAbs(c.CacheDirectory) {
+		c.CacheDirectory = filepath.Join(filepath.Dir(path), c.CacheDirectory)
+	}
 	for id, files := range c.Regions {
+		if id == overpassSource {
+			return c, fmt.Errorf("reserved source ID %s", id)
+		}
+		if files.Bounds != nil {
+			if err := files.Bounds.Validate(); err != nil {
+				return c, fmt.Errorf("source %s bounds: %w", id, err)
+			}
+		}
 		if files.OSM == "" {
 			return c, fmt.Errorf("region %s has no OSM file", id)
 		}
@@ -61,7 +85,28 @@ func LoadCatalog(path string) (Catalog, error) {
 }
 
 func (s Source) Load(ctx context.Context, region logistics.Region) (logistics.Dataset, error) {
-	files, ok := s.Catalog.Regions[region.ID]
+	if region.SourceVersion != "" {
+		selected, err := s.ResolveArea(ctx, region.Bounds)
+		if err != nil {
+			return logistics.Dataset{}, err
+		}
+		if selected.ID != region.SourceID || selected.Version != region.SourceVersion {
+			return logistics.Dataset{}, fmt.Errorf("area source configuration changed; submit a new build")
+		}
+	}
+	sourceID := region.SourceID
+	if sourceID == "" {
+		sourceID = region.ID
+	}
+	files, ok := s.Catalog.Regions[sourceID]
+	if sourceID == overpassSource {
+		path, err := s.downloadArea(ctx, region)
+		if err != nil {
+			return logistics.Dataset{}, err
+		}
+		files = Files{OSM: path}
+		ok = true
+	}
 	if !ok {
 		return logistics.Dataset{}, fmt.Errorf("no source configured for region %s", region.ID)
 	}

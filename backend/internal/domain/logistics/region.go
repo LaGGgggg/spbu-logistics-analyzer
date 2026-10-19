@@ -1,9 +1,11 @@
 package logistics
 
 type Region struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Bounds Bounds `json:"bounds"`
+	SourceVersion string `json:"source_version,omitempty"`
+	SourceID      string `json:"source_id,omitempty"`
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	Bounds        Bounds `json:"bounds"`
 }
 
 func (r Region) Validate() error {

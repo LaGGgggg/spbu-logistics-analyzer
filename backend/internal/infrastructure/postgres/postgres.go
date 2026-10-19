@@ -67,7 +67,7 @@ func (p *Postgres) Initialize(ctx context.Context, regions []logistics.Region) (
 }
 
 func (p *Postgres) Regions(ctx context.Context) ([]logistics.Region, error) {
-	rows, err := p.Pool.Query(ctx, "SELECT payload FROM regions ORDER BY id")
+	rows, err := p.Pool.Query(ctx, "SELECT payload FROM regions WHERE coalesce(payload->>'source_id','')='' ORDER BY id")
 	if err != nil {
 		return nil, err
 	}
@@ -107,6 +107,20 @@ func (p *Postgres) RequestBuild(ctx context.Context, regionID string) (build.Bui
 		return build.BuildResult{}, err
 	}
 	return result, tx.Commit(ctx)
+}
+
+func (p *Postgres) RequestAreaBuild(ctx context.Context, region logistics.Region) (build.BuildResult, error) {
+	if err := region.Validate(); err != nil {
+		return build.BuildResult{}, err
+	}
+	payload, err := json.Marshal(region)
+	if err != nil {
+		return build.BuildResult{}, err
+	}
+	if _, err := p.Pool.Exec(ctx, "INSERT INTO regions(id,payload) VALUES($1,$2) ON CONFLICT(id) DO NOTHING", region.ID, payload); err != nil {
+		return build.BuildResult{}, err
+	}
+	return p.RequestBuild(ctx, region.ID)
 }
 
 const jobColumns = "id, region_id, status, coalesce(graph_id,''), error, created_at, updated_at"
