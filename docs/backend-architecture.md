@@ -9,15 +9,15 @@ PostgreSQL — технология её реализации.
 | Директория | Ответственность |
 |---|---|
 | `backend/main.go` | Сборка зависимостей, запуск HTTP и воркеров, завершение процесса |
-| `backend/internal/domain/logistics` | Граф, узлы, дуги, координаты, границы и грузовая политика |
-| `backend/internal/domain/buildjob` | Состояния и сущность задания |
-| `backend/internal/application/logistics_service` | Запуск и чтение результатов, выбор области, выполнение фоновых заданий |
-| `backend/internal/application/graph_build_service` | Построение графа, объединение узлов, маршрутизация и пространственный индекс |
-| `backend/internal/repository/logistics_repository` | Хранение регионов, графов и заданий в PostgreSQL |
-| `backend/internal/repository/osm` | Чтение OSM, подбор источника, Overpass и кэширование выгрузок |
-| `backend/internal/repository/config` | Чтение и проверка конфигурации запуска |
-| `backend/internal/interfaces/httpapi` | Gin, HTTP-контракт, проверка запросов и преобразование ошибок |
-| `backend/internal/interfaces/export` | CSV, матрицы, GeoJSON и GraphML |
+| `backend/domain/logistics` | Граф, узлы, дуги, координаты, границы и грузовая политика |
+| `backend/domain/buildjob` | Состояния и сущность задания |
+| `backend/logistics_service` | Запуск и чтение результатов, выбор области, выполнение фоновых заданий |
+| `backend/graph_build_service` | Построение графа, объединение узлов, маршрутизация и пространственный индекс |
+| `backend/repository/logistics_repository` | Хранение регионов, графов и заданий в PostgreSQL |
+| `backend/repository/osm` | Чтение OSM, подбор источника, Overpass и кэширование выгрузок |
+| `backend/repository/config` | Чтение и проверка конфигурации запуска |
+| `backend/interfaces/httpapi` | Gin, HTTP-контракт, проверка запросов и преобразование ошибок |
+| `backend/interfaces/export` | CSV, матрицы, GeoJSON и GraphML |
 | `backend/tests` | Тесты по слоям; имена тестовых директорий соответствуют рабочим пакетам |
 
 HTTP зависит от входного прикладного интерфейса `logistics_service.Queries`.

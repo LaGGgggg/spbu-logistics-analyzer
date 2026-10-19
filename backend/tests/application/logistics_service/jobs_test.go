@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/application/logistics_service"
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/domain/logistics"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/domain/logistics"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/logistics_service"
 )
 
 type builderFunc func(context.Context, logistics.Region) (logistics.LogisticsGraph, error)

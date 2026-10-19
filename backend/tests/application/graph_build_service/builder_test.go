@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/application/graph_build_service"
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/domain/logistics"
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/repository/osm"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/domain/logistics"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/graph_build_service"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/repository/osm"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/tests/testutil"
 )
 

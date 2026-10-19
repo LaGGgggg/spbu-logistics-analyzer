@@ -5,7 +5,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/domain/logistics"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/domain/logistics"
 )
 
 func TestFreightPolicy(t *testing.T) {
