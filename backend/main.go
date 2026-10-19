@@ -11,12 +11,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/graph_build_service"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/interfaces/httpapi"
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/logistics_service"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/repository/config"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/repository/logistics_repository"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/repository/osm"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/service/graph_build_service"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/service/logistics_service"
 )
 
 func main() {

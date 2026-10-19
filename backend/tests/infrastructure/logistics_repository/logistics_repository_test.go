@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/domain/logistics"
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/graph_build_service"
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/logistics_service"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/repository/logistics_repository"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/repository/osm"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/service/graph_build_service"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/service/logistics_service"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/tests/testutil"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"

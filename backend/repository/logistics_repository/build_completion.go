@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/domain/logistics"
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/logistics_service"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/service/logistics_service"
 )
 
 func (p *Repository) Complete(ctx context.Context, job logistics_service.Job, graph logistics.LogisticsGraph) error {

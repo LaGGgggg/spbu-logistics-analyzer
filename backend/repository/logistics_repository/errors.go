@@ -3,7 +3,7 @@ package logistics_repository
 import (
 	"errors"
 
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/logistics_service"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/service/logistics_service"
 	"github.com/jackc/pgx/v5"
 )
 

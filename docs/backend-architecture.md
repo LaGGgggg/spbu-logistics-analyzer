@@ -11,8 +11,8 @@ PostgreSQL — технология её реализации.
 | `backend/main.go` | Сборка зависимостей, запуск HTTP и воркеров, завершение процесса |
 | `backend/domain/logistics` | Граф, узлы, дуги, координаты, границы и грузовая политика |
 | `backend/domain/buildjob` | Состояния и сущность задания |
-| `backend/logistics_service` | Запуск и чтение результатов, выбор области, выполнение фоновых заданий |
-| `backend/graph_build_service` | Построение графа, объединение узлов, маршрутизация и пространственный индекс |
+| `backend/service/logistics_service` | Запуск и чтение результатов, выбор области, выполнение фоновых заданий |
+| `backend/service/graph_build_service` | Построение графа, объединение узлов, маршрутизация и пространственный индекс |
 | `backend/repository/logistics_repository` | Хранение регионов, графов и заданий в PostgreSQL |
 | `backend/repository/osm` | Чтение OSM, подбор источника, Overpass и кэширование выгрузок |
 | `backend/repository/config` | Чтение и проверка конфигурации запуска |

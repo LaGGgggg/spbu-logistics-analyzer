@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/domain/logistics"
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/logistics_service"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/service/logistics_service"
 )
 
 func (p *Repository) Regions(ctx context.Context) ([]logistics.Region, error) {
