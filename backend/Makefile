@@ -10,10 +10,10 @@ lint:
 	go tool staticcheck ./...
 
 fmt:
-	gofmt -w $$(find cmd internal tests -name '*.go' -type f)
+	gofmt -w $$(find . -name '*.go' -type f -not -path './var/*')
 
 fmt-check:
-	@files="$$(gofmt -l $$(find cmd internal tests -name '*.go' -type f))"; \
+	@files="$$(gofmt -l $$(find . -name '*.go' -type f -not -path './var/*'))"; \
 	if [ -n "$$files" ]; then printf '%s\n' "$$files"; exit 1; fi
 
 mod-check:

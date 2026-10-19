@@ -9,11 +9,14 @@ type Region struct {
 }
 
 func (r Region) Validate() error {
+
 	if err := validateText("region ID", r.ID); err != nil {
 		return err
 	}
+
 	if err := validateText("region name", r.Name); err != nil {
 		return err
 	}
+
 	return r.Bounds.Validate()
 }
