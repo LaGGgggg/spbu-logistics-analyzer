@@ -4,20 +4,26 @@
 Реализация хранения логистических данных называется `logistics_repository`;
 PostgreSQL — технология её реализации.
 
+Рабочий код, конфигурация, миграции и Makefile находятся в `backend/main`,
+тесты — в `backend/tests`. Файлы `backend/go.mod` и `backend/go.sum` задают
+общий модуль для обеих директорий. Запуск: `cd backend/main && go run .`;
+проверки из той же директории: `make check`. Пути к конфигам по умолчанию
+и локальным данным рассчитаны на запуск из `backend/main`.
+
 ## Слои и зависимости
 
 | Директория | Ответственность |
 |---|---|
-| `backend/main.go` | Сборка зависимостей, запуск HTTP и воркеров, завершение процесса |
-| `backend/domain/logistics` | Граф, узлы, дуги, координаты, границы и грузовая политика |
-| `backend/domain/buildjob` | Состояния и сущность задания |
-| `backend/service/logistics_service` | Запуск и чтение результатов, выбор области, выполнение фоновых заданий |
-| `backend/service/graph_build_service` | Построение графа, объединение узлов, маршрутизация и пространственный индекс |
-| `backend/repository/logistics_repository` | Хранение регионов, графов и заданий в PostgreSQL |
-| `backend/repository/osm` | Чтение OSM, подбор источника, Overpass и кэширование выгрузок |
-| `backend/repository/config` | Чтение и проверка конфигурации запуска |
-| `backend/interfaces/httpapi` | Gin, HTTP-контракт, проверка запросов и преобразование ошибок |
-| `backend/interfaces/export` | CSV, матрицы, GeoJSON и GraphML |
+| `backend/main/main.go` | Сборка зависимостей, запуск HTTP и воркеров, завершение процесса |
+| `backend/main/domain/logistics` | Граф, узлы, дуги, координаты, границы и грузовая политика |
+| `backend/main/domain/buildjob` | Состояния и сущность задания |
+| `backend/main/service/logistics_service` | Запуск и чтение результатов, выбор области, выполнение фоновых заданий |
+| `backend/main/service/graph_build_service` | Построение графа, объединение узлов, маршрутизация и пространственный индекс |
+| `backend/main/repository/logistics_repository` | Хранение регионов, графов и заданий в PostgreSQL |
+| `backend/main/repository/osm` | Чтение OSM, подбор источника, Overpass и кэширование выгрузок |
+| `backend/main/repository/config` | Чтение и проверка конфигурации запуска |
+| `backend/main/interfaces/httpapi` | Gin, HTTP-контракт, проверка запросов и преобразование ошибок |
+| `backend/main/interfaces/export` | CSV, матрицы, GeoJSON и GraphML |
 | `backend/tests` | Тесты по слоям; имена тестовых директорий соответствуют рабочим пакетам |
 
 HTTP зависит от входного прикладного интерфейса `logistics_service.Queries`.

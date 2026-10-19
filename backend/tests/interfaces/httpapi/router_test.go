@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/domain/logistics"
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/interfaces/httpapi"
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/service/logistics_service"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/domain/logistics"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/interfaces/httpapi"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/service/logistics_service"
 	"github.com/gin-gonic/gin"
 )
 

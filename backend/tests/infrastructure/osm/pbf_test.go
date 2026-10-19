@@ -9,7 +9,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/repository/osm"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/repository/osm"
 	"github.com/paulmach/osm"
 	"google.golang.org/protobuf/encoding/protowire"
 )

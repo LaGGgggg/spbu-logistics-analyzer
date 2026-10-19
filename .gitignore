@@ -48,4 +48,4 @@ Desktop.ini
 *.swp
 *.swo
 
-/backend/var/
+/backend/main/var/
