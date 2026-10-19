@@ -1,0 +1,687 @@
+openapi: 3.1.0
+info:
+  title: SPBU Logistics Analyzer API
+  version: 1.0.0
+  description: |
+    Асинхронное построение грузового мультимодального графа по данным OSM.
+    Передайте границы произвольной прямоугольной области или ID сохранённого пресета.
+    Ответ 202 содержит ID новой либо уже выполняемой задачи; опрашивайте GET /api/jobs/{id}.
+    После completed получите граф через GET /api/graphs/{id}.
+    Ответ 200 на запуск означает, что готовый граф найден в кэше.
+
+    Времена передаются в RFC3339, координаты — WGS84 в градусах, длины — в километрах.
+    ID являются непрозрачными строками. Процента готовности, отмены задачи и принудительной
+    пересборки в текущем API нет. Закрытие браузера не отменяет построение.
+    При остановке backend processing-задача может вернуться в pending.
+    Авторизация в текущей реализации отсутствует.
+servers:
+  - url: http://localhost:8080
+    description: Локальный Go backend
+  - url: /
+    description: Текущий origin при размещении за reverse proxy
+security: []
+tags:
+  - name: Service
+    description: Проверка процесса и машиночитаемый контракт
+  - name: Regions
+    description: Сохранённые пресеты областей
+  - name: Graphs
+    description: Построение и получение графов
+  - name: Jobs
+    description: Состояния фоновых задач
+  - name: Export
+    description: Выгрузка полного сохранённого графа
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      tags: [Service]
+      summary: Проверить работу HTTP-процесса
+      description: Не проверяет доступность БД, OSM или Overpass и не является readiness-проверкой.
+      responses:
+        '200':
+          description: HTTP-процесс работает
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+              example:
+                status: healthy
+                service: Logistics Network API
+  /openapi.yaml:
+    get:
+      operationId: getOpenApiSpec
+      tags: [Service]
+      summary: Получить эту OpenAPI-спецификацию
+      responses:
+        '200':
+          description: OpenAPI 3.1.0 в формате YAML
+          content:
+            application/yaml:
+              schema:
+                type: string
+  /api/regions:
+    get:
+      operationId: listRegions
+      tags: [Regions]
+      summary: Получить список пресетов
+      description: |
+        Возвращает сохранённые пресеты, а не все созданные пользовательские области.
+        Пустой список допустим: произвольные bounds можно передать без пресета.
+      responses:
+        '200':
+          description: Список пресетов, возможно пустой
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Region'
+              example:
+                - id: spb-leningrad
+                  name: Санкт-Петербург и Ленинградская область
+                  bounds: {west: 27.4, south: 58.4, east: 35.7, north: 61.4}
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/graphs:
+    post:
+      operationId: requestGraphBuild
+      tags: [Graphs]
+      summary: Запустить построение или получить ID готового графа
+      description: |
+        Укажите ровно один непустой селектор: region_id или bounds.
+        Поле со значением null трактуется как отсутствующее.
+        Неизвестные поля, пропущенные координаты и несколько JSON-объектов отклоняются.
+        Максимальный размер тела — 4096 байт; превышение возвращает 400, не 413.
+
+        Для bounds источник подбирается по покрытию локальных выгрузок, иначе используется
+        настроенный Overpass. Если источника нет, возвращается 422 до создания задачи.
+        Принятие задачи не гарантирует успешную загрузку внешних данных.
+
+        Одинаковые bounds и версия настроек источника переиспользуют задачу либо граф;
+        для пресета дедупликация выполняется по region_id. Повтор после failed может
+        создать новую задачу. Idempotency-Key не поддерживается.
+        При запросе с bounds ответы 200/202 дополнительно содержат region со снимком границ.
+        При запросе пресета region в ответе обычно отсутствует.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BuildRequest'
+            examples:
+              arbitraryArea:
+                summary: Произвольная область по координатам
+                value:
+                  bounds: {west: 30.1, south: 59.8, east: 30.5, north: 60.1}
+              preset:
+                summary: Сохранённый пресет
+                value: {region_id: spb-leningrad}
+      responses:
+        '200':
+          description: Готовый граф найден в кэше; запросите его по graph_id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadyBuild'
+              example: {graph_id: graph-example}
+          links:
+            graph:
+              operationId: getGraph
+              parameters:
+                id: '$response.body#/graph_id'
+        '202':
+          description: Новая или существующая активная задача; опрашивайте её по job_id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueuedBuild'
+              example: {job_id: job-example}
+          links:
+            job:
+              operationId: getJob
+              parameters:
+                id: '$response.body#/job_id'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          description: Пресет region_id не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example: {error: 'Регион, задача или граф не найдены.'}
+        '422':
+          description: Для bounds не настроен покрывающий источник и отсутствует Overpass fallback
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Для этой области нет источника данных. Настройте покрывающую выгрузку OSM или Overpass.
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/jobs/{id}:
+    get:
+      operationId: getJob
+      tags: [Jobs]
+      summary: Получить состояние задачи
+      description: |
+        pending — в очереди, processing — выполняется, completed — граф сохранён,
+        failed — построение не удалось. При failed сам запрос статуса возвращает 200.
+        При completed graph_id обязательно присутствует. error — публичное сообщение,
+        детали сбоя остаются в серверных логах. Истечение клиентского HTTP-таймаута
+        не означает, что серверная задача завершилась ошибкой.
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Текущее состояние задачи
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+              examples:
+                pending:
+                  value:
+                    id: job-example
+                    region_id: spb-leningrad
+                    status: pending
+                    created_at: '2026-10-19T12:00:00Z'
+                    updated_at: '2026-10-19T12:00:00Z'
+                completed:
+                  value:
+                    id: job-example
+                    region_id: spb-leningrad
+                    status: completed
+                    graph_id: graph-example
+                    created_at: '2026-10-19T12:00:00Z'
+                    updated_at: '2026-10-19T12:02:00Z'
+                failed:
+                  value:
+                    id: job-example
+                    region_id: spb-leningrad
+                    status: failed
+                    error: Не удалось построить граф. Проверьте исходные данные и повторите попытку.
+                    created_at: '2026-10-19T12:00:00Z'
+                    updated_at: '2026-10-19T12:02:00Z'
+          links:
+            completedGraph:
+              description: Используйте только при status=completed
+              operationId: getGraph
+              parameters:
+                id: '$response.body#/graph_id'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/graphs/{id}:
+    get:
+      operationId: getGraph
+      tags: [Graphs]
+      summary: Получить сохранённый граф
+      description: |
+        Возвращает узлы, дуги, полилинии и отчёт о данных. Не запускает построение.
+        Изолированные узлы допустимы. bounds присутствует у новых графов и может
+        отсутствовать у результатов, сохранённых старой версией backend.
+        При фильтрации mode поле coverage остаётся отчётом всего графа.
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - name: mode
+          in: query
+          required: false
+          description: Один вид транспорта. Отсутствующее или пустое значение возвращает все режимы.
+          allowEmptyValue: true
+          schema:
+            type: string
+            enum: [road, rail, sea, river, air, '']
+      responses:
+        '200':
+          description: Полный граф либо один транспортный слой
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogisticsGraph'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/graphs/{id}/coverage:
+    get:
+      operationId: getGraphCoverage
+      tags: [Graphs]
+      summary: Получить диагностику источников и отбора объектов
+      description: Тот же отчёт, что содержится в coverage ответа GET графа.
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Отчёт всего графа
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Coverage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/graphs/{id}/export/{format}:
+    get:
+      operationId: exportGraph
+      tags: [Export]
+      summary: Скачать полный сохранённый граф
+      description: |
+        Всегда экспортирует полный граф; фильтр mode этого endpoint не поддерживается.
+        nodes.csv — таблица узлов; edges.csv — таблица дуг с геометрией и видами транспорта.
+        adjacency.csv — направленная матрица расстояний: пустая ячейка означает отсутствие
+        дуги, ноль — нулевую длину. Параллельные дуги сводятся к минимальной длине.
+        incidence.csv — матрица с отдельным столбцом для каждой дуги: -1 в начале,
+        +1 в конце; для ненаправленного ребра +1 на обоих концах.
+        geojson — FeatureCollection с Point/LineString и координатами [longitude, latitude].
+        graphml — XML графа с направлением, внешними ID, длинами и геометрией.
+
+        Матрица смежности ограничена 5000 узлами, инцидентности — 25 млн ячеек.
+        При 422 используйте edges.csv или graphml. Ошибки до начала выгрузки возвращаются
+        как application/json. При сбое записи уже начатый поток может быть оборван;
+        заменить его завершённым JSON-ответом сервер не может.
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - name: format
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/ExportFormat'
+      responses:
+        '200':
+          description: Файл выбранного формата
+          headers:
+            Content-Disposition:
+              description: attachment с именем graph-{format}
+              schema:
+                type: string
+              example: attachment; filename=graph-edges.csv
+          content:
+            text/csv:
+              schema:
+                type: string
+              example: |
+                id,from_node_id,to_node_id,mode,distance_km,directed,geometry,source
+            application/geo+json:
+              schema:
+                $ref: '#/components/schemas/GeoJSONCollection'
+            application/graphml+xml:
+              schema:
+                type: string
+        '400':
+          description: Неверный формат экспорта или ID; при неверном формате присутствует formats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Неизвестный формат экспорта.
+                formats: [nodes.csv, edges.csv, adjacency.csv, incidence.csv, geojson, graphml]
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Размер матрицы превышает серверный лимит
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example: {error: 'Матрица слишком велика; используйте edges.csv или GraphML.'}
+        '500':
+          $ref: '#/components/responses/InternalError'
+components:
+  parameters:
+    ResourceId:
+      name: id
+      in: path
+      required: true
+      description: Непрозрачный ID задачи или графа. При подстановке в URL кодируйте как сегмент пути.
+      schema:
+        $ref: '#/components/schemas/RequestId'
+  responses:
+    BadRequest:
+      description: Некорректный JSON, параметры, границы, ID или превышение размера тела
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example: {error: Некорректный идентификатор.}
+    NotFound:
+      description: Регион, задача или граф не найдены
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example: {error: 'Регион, задача или граф не найдены.'}
+    InternalError:
+      description: Внутренняя ошибка операции с хранилищем
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example: {error: Ошибка хранилища. Повторите запрос позже.}
+  schemas:
+    NonEmptyText:
+      type: string
+      minLength: 1
+      pattern: '^\S(?:[\s\S]*\S)?$'
+      description: Непустая строка без пробелов по краям.
+    RequestId:
+      allOf:
+        - $ref: '#/components/schemas/NonEmptyText'
+        - maxLength: 128
+    TransportMode:
+      type: string
+      enum: [road, rail, sea, river, air]
+    Coordinates:
+      type: object
+      required: [longitude, latitude]
+      properties:
+        longitude: {type: number, minimum: -180, maximum: 180}
+        latitude: {type: number, minimum: -90, maximum: 90}
+    Bounds:
+      type: object
+      additionalProperties: false
+      required: [west, south, east, north]
+      description: |
+        Прямоугольник WGS84. Дополнительно сервер проверяет west < east и south < north.
+        Сравнения между полями не выражены стандартной JSON Schema.
+        Пересечение антимеридиана и нулевая площадь не поддерживаются.
+      properties:
+        west: {type: number, minimum: -180, maximum: 180}
+        south: {type: number, minimum: -90, maximum: 90}
+        east: {type: number, minimum: -180, maximum: 180}
+        north: {type: number, minimum: -90, maximum: 90}
+      example: {west: 30.1, south: 59.8, east: 30.5, north: 60.1}
+    Region:
+      type: object
+      required: [id, name, bounds]
+      properties:
+        id:
+          $ref: '#/components/schemas/NonEmptyText'
+        name:
+          $ref: '#/components/schemas/NonEmptyText'
+        bounds:
+          $ref: '#/components/schemas/Bounds'
+        source_id:
+          type: string
+          description: Источник пользовательской области; отсутствует у обычного пресета.
+        source_version:
+          type: string
+          description: Версия настроек источника и грузовой политики, не гарантия свежести OSM.
+    BuildRequest:
+      oneOf:
+        - $ref: '#/components/schemas/BuildByRegion'
+        - $ref: '#/components/schemas/BuildByBounds'
+    BuildByRegion:
+      type: object
+      additionalProperties: false
+      required: [region_id]
+      properties:
+        region_id:
+          $ref: '#/components/schemas/RequestId'
+        bounds:
+          type: 'null'
+          description: Необязательное null эквивалентно отсутствию поля.
+    BuildByBounds:
+      type: object
+      additionalProperties: false
+      required: [bounds]
+      properties:
+        bounds:
+          $ref: '#/components/schemas/Bounds'
+        region_id:
+          type: 'null'
+          description: Необязательное null эквивалентно отсутствию поля.
+    ReadyBuild:
+      type: object
+      required: [graph_id]
+      properties:
+        graph_id:
+          $ref: '#/components/schemas/NonEmptyText'
+        region:
+          $ref: '#/components/schemas/Region'
+      not:
+        required: [job_id]
+    QueuedBuild:
+      type: object
+      required: [job_id]
+      properties:
+        job_id:
+          $ref: '#/components/schemas/NonEmptyText'
+        region:
+          $ref: '#/components/schemas/Region'
+      not:
+        required: [graph_id]
+    Job:
+      type: object
+      required: [id, region_id, status, created_at, updated_at]
+      properties:
+        id:
+          $ref: '#/components/schemas/NonEmptyText'
+        region_id:
+          $ref: '#/components/schemas/NonEmptyText'
+        status:
+          type: string
+          enum: [pending, processing, completed, failed]
+        graph_id:
+          $ref: '#/components/schemas/NonEmptyText'
+        error:
+          type: string
+          description: Публичное описание ошибки построения, если доступно.
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+      allOf:
+        - if:
+            properties:
+              status: {const: completed}
+          then:
+            required: [graph_id]
+          else:
+            not:
+              required: [graph_id]
+    ExternalID:
+      type: object
+      required: [namespace, value]
+      properties:
+        namespace:
+          type: string
+          enum: [osm_node, osm_way, osm_relation, esr, unlocode, iata, icao]
+        value:
+          $ref: '#/components/schemas/NonEmptyText'
+      description: Значения строковые; сохраняют ведущие нули. Пространства OSM node/way/relation различаются.
+    LogisticsNode:
+      type: object
+      required: [id, name, region_id, coordinates, modes, external_ids]
+      properties:
+        id:
+          $ref: '#/components/schemas/NonEmptyText'
+        name:
+          $ref: '#/components/schemas/NonEmptyText'
+        region_id:
+          $ref: '#/components/schemas/NonEmptyText'
+        coordinates:
+          $ref: '#/components/schemas/Coordinates'
+        modes:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/TransportMode'
+        external_ids:
+          type: [array, 'null']
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/ExternalID'
+        kind: {type: string}
+        cargo: {type: string}
+        sources:
+          type: array
+          items: {type: string}
+      description: Один физический объект с набором видов транспорта и внешних идентификаторов.
+    LogisticsEdge:
+      type: object
+      required: [id, from_node_id, to_node_id, mode, distance_km, geometry, directed]
+      properties:
+        id:
+          $ref: '#/components/schemas/NonEmptyText'
+        from_node_id:
+          $ref: '#/components/schemas/NonEmptyText'
+        to_node_id:
+          $ref: '#/components/schemas/NonEmptyText'
+        mode:
+          $ref: '#/components/schemas/TransportMode'
+        distance_km: {type: number, minimum: 0, maximum: 1000000000}
+        geometry:
+          type: array
+          minItems: 2
+          items:
+            $ref: '#/components/schemas/Coordinates'
+        directed: {type: boolean}
+        source: {type: string}
+      description: |
+        Дуга между существующими узлами, поддерживающими её вид транспорта.
+        Геометрия идёт по загруженной сети; точки привязки могут отличаться от центров объектов.
+    LogisticsGraph:
+      type: object
+      required: [id, region_id, nodes, edges, coverage]
+      properties:
+        id:
+          $ref: '#/components/schemas/NonEmptyText'
+        region_id:
+          $ref: '#/components/schemas/NonEmptyText'
+        bounds:
+          $ref: '#/components/schemas/Bounds'
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/LogisticsNode'
+        edges:
+          type: array
+          items:
+            $ref: '#/components/schemas/LogisticsEdge'
+        coverage:
+          $ref: '#/components/schemas/Coverage'
+    NullableStringArray:
+      type: [array, 'null']
+      items: {type: string}
+      description: При отсутствии значений текущий backend может вернуть null вместо [].
+    Coverage:
+      type: object
+      required: [candidates, accepted, rejected, reference_total, reference_matched, unmatched_reference_ids, unrouted_node_modes, sources, warnings]
+      properties:
+        candidates:
+          type: integer
+          minimum: 0
+          description: Количество исходных кандидатов внутри области.
+        accepted:
+          type: integer
+          minimum: 0
+          description: Число итоговых физических узлов после объединения и дополнения реестрами.
+        rejected: {type: integer, minimum: 0}
+        reference_total: {type: integer, minimum: 0}
+        reference_matched: {type: integer, minimum: 0}
+        unmatched_reference_ids:
+          $ref: '#/components/schemas/NullableStringArray'
+        unrouted_node_modes:
+          $ref: '#/components/schemas/NullableStringArray'
+        sources:
+          $ref: '#/components/schemas/NullableStringArray'
+        warnings:
+          $ref: '#/components/schemas/NullableStringArray'
+      description: |
+        Диагностика загруженных данных, а не оценка всех существующих объектов региона.
+        accepted не обязательно равно candidates - rejected из-за объединения и добавления узлов.
+        reference_matched/reference_total относится только к подключённому справочнику;
+        при reference_total=0 доля не определена. unrouted_node_modes — отсутствие привязки
+        узла к точке соответствующей сети, а не полный анализ связности.
+    ExportFormat:
+      type: string
+      enum: [nodes.csv, edges.csv, adjacency.csv, incidence.csv, geojson, graphml]
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: {type: string}
+        formats:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExportFormat'
+      description: Публичное сообщение; структурированные code и request_id пока не реализованы.
+    Health:
+      type: object
+      required: [status, service]
+      properties:
+        status: {type: string, const: healthy}
+        service: {type: string, const: Logistics Network API}
+    GeoJSONCollection:
+      type: object
+      required: [type, features]
+      properties:
+        type: {type: string, const: FeatureCollection}
+        features:
+          type: array
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/GeoJSONNode'
+              - $ref: '#/components/schemas/GeoJSONEdge'
+    GeoJSONPosition:
+      type: array
+      minItems: 2
+      maxItems: 2
+      prefixItems:
+        - {type: number, minimum: -180, maximum: 180}
+        - {type: number, minimum: -90, maximum: 90}
+      items: false
+      description: '[longitude, latitude]'
+    GeoJSONNode:
+      type: object
+      required: [type, id, geometry, properties]
+      properties:
+        type: {type: string, const: Feature}
+        id: {type: string}
+        geometry:
+          type: object
+          required: [type, coordinates]
+          properties:
+            type: {type: string, const: Point}
+            coordinates:
+              $ref: '#/components/schemas/GeoJSONPosition'
+        properties:
+          $ref: '#/components/schemas/LogisticsNode'
+    GeoJSONEdge:
+      type: object
+      required: [type, id, geometry, properties]
+      properties:
+        type: {type: string, const: Feature}
+        id: {type: string}
+        geometry:
+          type: object
+          required: [type, coordinates]
+          properties:
+            type: {type: string, const: LineString}
+            coordinates:
+              type: array
+              minItems: 2
+              items:
+                $ref: '#/components/schemas/GeoJSONPosition'
+        properties:
+          type: object
+          required: [from_node_id, to_node_id, mode, distance_km, directed, source]
+          properties:
+            from_node_id: {type: string}
+            to_node_id: {type: string}
+            mode:
+              $ref: '#/components/schemas/TransportMode'
+            distance_km: {type: number, minimum: 0}
+            directed: {type: boolean}
+            source: {type: string}
