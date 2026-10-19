@@ -47,3 +47,5 @@ Desktop.ini
 *.tmp
 *.swp
 *.swo
+
+/backend/var/
