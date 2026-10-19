@@ -13,8 +13,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/domain/logistics"
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/repository/osm"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/domain/logistics"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/repository/osm"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/tests/testutil"
 )
 

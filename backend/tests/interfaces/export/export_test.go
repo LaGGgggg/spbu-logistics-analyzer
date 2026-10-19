@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/domain/logistics"
-	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/interfaces/export"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/domain/logistics"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/interfaces/export"
 )
 
 func fixture() logistics.LogisticsGraph {
