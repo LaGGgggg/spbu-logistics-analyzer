@@ -10,10 +10,10 @@ lint:
 	go tool staticcheck ./...
 
 fmt:
-	gofmt -w $$(find cmd internal -name '*.go' -type f)
+	gofmt -w $$(find cmd internal tests -name '*.go' -type f)
 
 fmt-check:
-	@files="$$(gofmt -l $$(find cmd internal -name '*.go' -type f))"; \
+	@files="$$(gofmt -l $$(find cmd internal tests -name '*.go' -type f))"; \
 	if [ -n "$$files" ]; then printf '%s\n' "$$files"; exit 1; fi
 
 mod-check:
@@ -21,6 +21,6 @@ mod-check:
 	go mod verify
 
 test:
-	go test -race ./...
+	go test -race ./tests/...
 
 check: fmt-check mod-check build vet lint test

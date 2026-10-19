@@ -1,4 +1,4 @@
-package osmdata
+package osmdata_test
 
 import (
 	"bytes"
@@ -9,6 +9,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/infrastructure/osm"
 	"github.com/paulmach/osm"
 	"google.golang.org/protobuf/encoding/protowire"
 )
@@ -48,7 +49,7 @@ func tinyPBF() []byte {
 }
 
 func TestPBFScannerReadsNode(t *testing.T) {
-	scanner, err := NewPBFScanner(context.Background(), bytes.NewReader(tinyPBF()), 1)
+	scanner, err := osmdata.NewPBFScanner(context.Background(), bytes.NewReader(tinyPBF()), 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +74,7 @@ func TestPBFScannerReadsNode(t *testing.T) {
 }
 
 func TestPBFScannerRejectsTruncatedInput(t *testing.T) {
-	scanner, err := NewPBFScanner(context.Background(), bytes.NewReader([]byte{0, 0}), 1)
+	scanner, err := osmdata.NewPBFScanner(context.Background(), bytes.NewReader([]byte{0, 0}), 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +87,7 @@ func TestPBFScannerRejectsTruncatedInput(t *testing.T) {
 func TestPBFScannerStopsOnCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	scanner, err := NewPBFScanner(ctx, bytes.NewReader(tinyPBF()), 1)
+	scanner, err := osmdata.NewPBFScanner(ctx, bytes.NewReader(tinyPBF()), 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +115,7 @@ func TestPBFScannerValidatesArguments(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, err := NewPBFScanner(tc.ctx, tc.reader, tc.workers); err == nil {
+			if _, err := osmdata.NewPBFScanner(tc.ctx, tc.reader, tc.workers); err == nil {
 				t.Fatal("expected argument error")
 			}
 		})
