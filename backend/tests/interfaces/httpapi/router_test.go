@@ -1,4 +1,4 @@
-package httpapi
+package httpapi_test
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/application/build"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/domain/logistics"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/interfaces/httpapi"
 	"github.com/gin-gonic/gin"
 )
 
@@ -42,7 +43,7 @@ func (q *queries) GetGraph(_ context.Context, id string) (logistics.LogisticsGra
 func TestAPIValidationAndExports(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	q := &queries{}
-	r := NewRouter(q)
+	r := httpapi.NewRouter(q)
 	cases := []struct {
 		method, path, body string
 		status             int
@@ -80,7 +81,7 @@ func TestAPIValidationAndExports(t *testing.T) {
 
 func TestAreaWithoutSourceReturns422(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := NewRouter(&queries{areaErr: build.ErrAreaUnavailable})
+	router := httpapi.NewRouter(&queries{areaErr: build.ErrAreaUnavailable})
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, httptest.NewRequest("POST", "/api/graphs", strings.NewReader(`{"bounds":{"west":1,"south":1,"east":2,"north":2}}`)))
 	if response.Code != 422 {

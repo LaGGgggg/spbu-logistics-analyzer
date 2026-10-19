@@ -8,10 +8,11 @@ import (
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/application/network"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/domain/logistics"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/infrastructure/osm"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/tests/testutil"
 )
 
 func TestOSMPipelineFollowsInfrastructure(t *testing.T) {
-	root := filepath.Join("..", "..", "..", "testdata")
+	root := testutil.FixtureDir(t)
 	pipeline := network.Pipeline{Policy: logistics.DefaultFreightPolicy(), Source: osmdata.Source{Catalog: osmdata.Catalog{MaximumObjects: 1000, Regions: map[string]osmdata.Files{"test": {OSM: filepath.Join(root, "freight.osm"), References: filepath.Join(root, "references.json")}}}}}
 	region := logistics.Region{ID: "test", Name: "Test region", Bounds: logistics.Bounds{West: 29, South: 59, East: 31, North: 61}}
 	g, err := pipeline.Build(context.Background(), region)

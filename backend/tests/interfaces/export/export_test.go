@@ -1,4 +1,4 @@
-package export
+package export_test
 
 import (
 	"bytes"
@@ -9,16 +9,17 @@ import (
 	"testing"
 
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/domain/logistics"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/interfaces/export"
 )
 
 func fixture() logistics.LogisticsGraph {
 	return logistics.LogisticsGraph{ID: "g", RegionID: "r", Nodes: []logistics.LogisticsNode{{ID: "a", Name: "=SUM(1,2)"}, {ID: "b", Name: "Порт & терминал"}, {ID: "isolated"}}, Edges: []logistics.LogisticsEdge{{ID: "e1", FromNodeID: "a", ToNodeID: "b", Mode: logistics.TransportRoad, DistanceKM: 3, Directed: true, Geometry: []logistics.Coordinates{{Longitude: 30, Latitude: 60}, {Longitude: 31, Latitude: 61}}}, {ID: "e2", FromNodeID: "a", ToNodeID: "b", Mode: logistics.TransportRail, DistanceKM: 2, Directed: true}}}
 }
 func TestExports(t *testing.T) {
-	for _, format := range Formats {
+	for _, format := range export.Formats {
 		t.Run(format, func(t *testing.T) {
 			var b bytes.Buffer
-			if err := Write(&b, fixture(), format); err != nil {
+			if err := export.Write(&b, fixture(), format); err != nil {
 				t.Fatal(err)
 			}
 			switch format {

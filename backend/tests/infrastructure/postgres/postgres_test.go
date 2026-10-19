@@ -15,6 +15,7 @@ import (
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/domain/logistics"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/infrastructure/osm"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/infrastructure/postgres"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/tests/testutil"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -96,7 +97,7 @@ func TestPostgresBuildLifecycle(t *testing.T) {
 	if _, err := service.RequestBuild(ctx, "unknown"); !errors.Is(err, build.ErrNotFound) {
 		t.Fatalf("unknown region: %v", err)
 	}
-	root := filepath.Join("..", "..", "..", "testdata")
+	root := testutil.FixtureDir(t)
 	pipeline := network.Pipeline{Policy: logistics.DefaultFreightPolicy(), Source: osmdata.Source{Catalog: osmdata.Catalog{MaximumObjects: 1000, Regions: map[string]osmdata.Files{"test": {OSM: filepath.Join(root, "freight.osm"), References: filepath.Join(root, "references.json")}}}}}
 	manager := build.Manager{Repository: repo, Builder: pipeline, Workers: 2, PollInterval: time.Millisecond * 10, BuildTimeout: time.Second * 5}
 	workerCtx, stop := context.WithCancel(ctx)

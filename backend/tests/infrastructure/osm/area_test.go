@@ -13,6 +13,7 @@ import (
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/application/build"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/domain/logistics"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/infrastructure/osm"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/tests/testutil"
 )
 
 func TestAreaSelectsSmallestCoveringSource(t *testing.T) {
@@ -34,7 +35,7 @@ func TestAreaSelectsSmallestCoveringSource(t *testing.T) {
 	}
 }
 func TestOverpassLoadsArbitraryAreaAndCachesXML(t *testing.T) {
-	fixture, err := os.ReadFile("../../../testdata/freight.osm")
+	fixture, err := os.ReadFile(testutil.FixturePath(t, "freight.osm"))
 	if err != nil {
 		t.Fatal(err)
 	}
