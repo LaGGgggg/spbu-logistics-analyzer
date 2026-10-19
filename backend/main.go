@@ -28,6 +28,7 @@ func main() {
 }
 
 func run() error {
+
 	cfg, err := config.Load()
 
 	if err != nil {
@@ -55,9 +56,11 @@ func run() error {
 	defer cancel()
 
 	repository, err := logistics_repository.Open(startup, cfg.DatabaseURL)
+
 	if err != nil {
 		return err
 	}
+
 	defer repository.Close()
 
 	release, err := repository.Initialize(startup, cfg.Regions)
@@ -72,12 +75,19 @@ func run() error {
 	manager := &logistics_service.WorkerService{Repository: repository, Builder: graph_build_service.Service{Source: source, Policy: catalog.Policy}, Workers: cfg.Workers, PollInterval: time.Second, BuildTimeout: cfg.BuildTimeout}
 	workerDone := make(chan error, 1)
 
-	go func() { workerDone <- manager.Run(ctx) }()
+	go func() {
+		workerDone <- manager.Run(ctx)
+	}()
+
 	server := &http.Server{Addr: cfg.HTTPAddr, Handler: httpapi.NewRouter(logistics_service.NewService(repository, source)), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: time.Minute}
 	serverDone := make(chan error, 1)
 
-	go func() { serverDone <- server.ListenAndServe() }()
+	go func() {
+		serverDone <- server.ListenAndServe()
+	}()
+
 	slog.Info("HTTP server started", "address", cfg.HTTPAddr, "workers", cfg.Workers)
+
 	select {
 
 	case <-ctx.Done():
@@ -87,18 +97,24 @@ func run() error {
 		stop()
 		workerDone = nil
 	}
+
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+
 	defer shutdownCancel()
+
 	if shutdownErr := server.Shutdown(shutdownCtx); shutdownErr != nil {
 		slog.Error("HTTP shutdown", "error", shutdownErr)
 	}
+
 	if workerDone != nil {
 		if workerErr := <-workerDone; err == nil {
 			err = workerErr
 		}
 	}
+
 	if errors.Is(err, http.ErrServerClosed) {
 		return nil
 	}
+
 	return err
 }

@@ -8,6 +8,7 @@ import (
 )
 
 func translate(err error) error {
+
 	if errors.Is(err, pgx.ErrNoRows) {
 		return logistics_service.ErrNotFound
 	}

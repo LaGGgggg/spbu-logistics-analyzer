@@ -21,6 +21,7 @@ func (p *Repository) Initialize(ctx context.Context, regions []logistics.Region)
 
 	if err := conn.QueryRow(ctx, "SELECT pg_try_advisory_lock(81743021)").Scan(&locked); err != nil || !locked {
 		conn.Release()
+
 		if err != nil {
 			return nil, err
 		}
@@ -38,19 +39,25 @@ func (p *Repository) Initialize(ctx context.Context, regions []logistics.Region)
 
 	if err != nil {
 		release()
+
 		return nil, err
 	}
 
-	defer func() { _ = tx.Rollback(context.Background()) }()
+	defer func() {
+		_ = tx.Rollback(context.Background())
+	}()
 
 	if _, err = tx.Exec(ctx, migrations.InitialSchema); err == nil {
 		for _, region := range regions {
 			var payload []byte
 			payload, err = json.Marshal(region)
+
 			if err != nil {
 				break
 			}
+
 			_, err = tx.Exec(ctx, "INSERT INTO regions(id,payload) VALUES($1,$2) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload", region.ID, payload)
+
 			if err != nil {
 				break
 			}
@@ -67,6 +74,7 @@ func (p *Repository) Initialize(ctx context.Context, regions []logistics.Region)
 
 	if err != nil {
 		release()
+
 		return nil, err
 	}
 

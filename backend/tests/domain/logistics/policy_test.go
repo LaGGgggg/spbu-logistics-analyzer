@@ -9,6 +9,7 @@ import (
 )
 
 func TestFreightPolicy(t *testing.T) {
+
 	cases := []struct {
 		name   string
 		tags   map[string]string
@@ -29,32 +30,41 @@ func TestFreightPolicy(t *testing.T) {
 		{"large warehouse", map[string]string{"building": "warehouse"}, 10000, true, logistics.TransportRoad},
 		{"office", map[string]string{"office": "logistics"}, 0, false, ""},
 	}
+
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			node, ok := logistics.DefaultFreightPolicy().Classify(logistics.Feature{ExternalID: logistics.ExternalID{Namespace: logistics.ExternalOSMNode, Value: "1"}, Tags: c.tags, AreaM2: c.area}, nil)
+
 			if ok != c.accept {
 				t.Fatalf("accepted=%v want %v", ok, c.accept)
 			}
+
 			if ok && !slices.Contains(node.Modes, c.mode) {
 				t.Fatalf("modes=%v", node.Modes)
 			}
 		})
 	}
 }
+
 func TestESRMatching(t *testing.T) {
+
 	for _, v := range []string{"1234-Э", "1234-ПЕР", "1234-ПАР", "123", "1234abc"} {
 		if logistics.ESRKey(v) != "" {
 			t.Fatalf("service/invalid code %q accepted", v)
 		}
 	}
+
 	if !logistics.SameExternalID(logistics.ExternalID{Namespace: logistics.ExternalESR, Value: "123456"}, logistics.ExternalID{Namespace: logistics.ExternalESR, Value: "123400"}) {
 		t.Fatal("ESR prefixes did not match")
 	}
 }
+
 func TestRejectNonFiniteValues(t *testing.T) {
+
 	if (logistics.Coordinates{Longitude: math.NaN()}).Validate() == nil {
 		t.Fatal("NaN accepted")
 	}
+
 	if (logistics.FreightPolicy{MaximumSnapKM: math.Inf(1)}).Validate() == nil {
 		t.Fatal("infinite snapping radius accepted")
 	}

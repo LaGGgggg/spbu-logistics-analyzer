@@ -57,17 +57,22 @@ func Load() (Config, error) {
 		if err := region.Validate(); err != nil {
 			return result, fmt.Errorf("region %s: %w", region.ID, err)
 		}
+
 		if seen[region.ID] {
 			return result, fmt.Errorf("duplicate region %s", region.ID)
 		}
+
 		seen[region.ID] = true
 	}
+
 	return result, nil
 }
 
 func value(key, fallback string) string {
+
 	if v := os.Getenv(key); v != "" {
 		return v
 	}
+
 	return fallback
 }

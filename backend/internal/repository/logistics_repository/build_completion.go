@@ -25,7 +25,9 @@ func (p *Repository) Complete(ctx context.Context, job logistics_service.Job, gr
 		return err
 	}
 
-	defer func() { _ = tx.Rollback(context.Background()) }()
+	defer func() {
+		_ = tx.Rollback(context.Background())
+	}()
 
 	if graph.Nodes == nil {
 		graph.Nodes = []logistics.LogisticsNode{}

@@ -20,10 +20,12 @@ type ExternalID struct {
 }
 
 func (id ExternalID) Validate() error {
+
 	switch id.Namespace {
 	case ExternalOSMNode, ExternalOSMWay, ExternalOSMRelation, ExternalESR, ExternalUNLOCODE, ExternalIATA, ExternalICAO:
 	default:
 		return fmt.Errorf("unknown external namespace %q", id.Namespace)
 	}
+
 	return validateText("external ID value", id.Value)
 }

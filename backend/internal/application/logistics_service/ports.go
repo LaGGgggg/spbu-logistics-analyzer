@@ -13,10 +13,12 @@ type Queries interface {
 	GetJob(context.Context, string) (Job, error)
 	GetGraph(context.Context, string) (logistics.LogisticsGraph, error)
 }
+
 type AreaSource struct {
 	ID      string
 	Version string
 }
+
 type AreaResolver interface {
 	ResolveArea(context.Context, logistics.Bounds) (AreaSource, error)
 }

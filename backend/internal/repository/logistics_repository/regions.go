@@ -34,15 +34,20 @@ func (p *Repository) Regions(ctx context.Context) ([]logistics.Region, error) {
 }
 
 func (p *Repository) RequestAreaBuild(ctx context.Context, region logistics.Region) (logistics_service.BuildResult, error) {
+
 	if err := region.Validate(); err != nil {
 		return logistics_service.BuildResult{}, err
 	}
+
 	payload, err := json.Marshal(region)
+
 	if err != nil {
 		return logistics_service.BuildResult{}, err
 	}
+
 	if _, err := p.pool.Exec(ctx, "INSERT INTO regions(id,payload) VALUES($1,$2) ON CONFLICT(id) DO NOTHING", region.ID, payload); err != nil {
 		return logistics_service.BuildResult{}, err
 	}
+
 	return p.RequestBuild(ctx, region.ID)
 }

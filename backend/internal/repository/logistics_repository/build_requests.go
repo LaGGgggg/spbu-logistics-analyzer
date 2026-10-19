@@ -17,7 +17,9 @@ func (p *Repository) RequestBuild(ctx context.Context, regionID string) (logisti
 		return logistics_service.BuildResult{}, err
 	}
 
-	defer func() { _ = tx.Rollback(context.Background()) }()
+	defer func() {
+		_ = tx.Rollback(context.Background())
+	}()
 
 	var id string
 
@@ -31,6 +33,7 @@ func (p *Repository) RequestBuild(ctx context.Context, regionID string) (logisti
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		err = tx.QueryRow(ctx, "SELECT id FROM jobs WHERE region_id=$1 AND status IN ('pending','processing')", regionID).Scan(&result.JobID)
+
 		if errors.Is(err, pgx.ErrNoRows) {
 			result.JobID = rand.Text()
 			_, err = tx.Exec(ctx, "INSERT INTO jobs(id,region_id,status) VALUES($1,$2,'pending')", result.JobID, regionID)

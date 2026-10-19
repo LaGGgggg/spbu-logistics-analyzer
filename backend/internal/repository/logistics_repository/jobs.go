@@ -25,33 +25,44 @@ func (p *Repository) GetJob(ctx context.Context, id string) (logistics_service.J
 }
 
 func (p *Repository) Claim(ctx context.Context) (logistics_service.Job, logistics.Region, error) {
+
 	tx, err := p.pool.Begin(ctx)
 
 	if err != nil {
 		return logistics_service.Job{}, logistics.Region{}, err
 	}
 
-	defer func() { _ = tx.Rollback(context.Background()) }()
+	defer func() {
+		_ = tx.Rollback(context.Background())
+	}()
 
 	job, err := scanJob(tx.QueryRow(ctx, `UPDATE jobs SET status='processing', updated_at=now()
 		WHERE id=(SELECT id FROM jobs WHERE status='pending' ORDER BY created_at,id FOR UPDATE SKIP LOCKED LIMIT 1)
 		RETURNING `+jobColumns))
+
 	if err != nil {
 		return logistics_service.Job{}, logistics.Region{}, err
 	}
+
 	var region logistics.Region
+
 	if err := tx.QueryRow(ctx, "SELECT payload FROM regions WHERE id=$1", job.RegionID).Scan(&region); err != nil {
 		return logistics_service.Job{}, region, err
 	}
+
 	return job, region, tx.Commit(ctx)
 }
 
 func (p *Repository) Fail(ctx context.Context, id, message string) error {
+
 	_, err := p.pool.Exec(ctx, "UPDATE jobs SET status='failed', error=$2, updated_at=now() WHERE id=$1 AND status='processing'", id, message)
+
 	return err
 }
 
 func (p *Repository) Requeue(ctx context.Context, id string) error {
+
 	_, err := p.pool.Exec(ctx, "UPDATE jobs SET status='pending', updated_at=now() WHERE id=$1 AND status='processing'", id)
+
 	return err
 }
