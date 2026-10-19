@@ -4,7 +4,7 @@
 
 # Frontend build
 **/dist/
-**/build/
+/frontend/build/
 **/.vite/
 **/*.tsbuildinfo
 
