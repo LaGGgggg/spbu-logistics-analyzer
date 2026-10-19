@@ -1,0 +1,176 @@
+package postgres_test
+
+import (
+	"context"
+	"crypto/rand"
+	"errors"
+	"os"
+	"path/filepath"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/application/build"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/application/network"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/domain/logistics"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/infrastructure/osm"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/internal/infrastructure/postgres"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+func TestPostgresBuildLifecycle(t *testing.T) {
+	url := os.Getenv("TEST_DATABASE_URL")
+	if url == "" {
+		t.Skip("set TEST_DATABASE_URL to run PostgreSQL integration")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	admin, err := pgxpool.New(ctx, url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer admin.Close()
+	schema := "logistics_test_" + rand.Text()
+	quoted := pgx.Identifier{schema}.Sanitize()
+	if _, err := admin.Exec(ctx, "CREATE SCHEMA "+quoted); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _, _ = admin.Exec(context.Background(), "DROP SCHEMA "+quoted+" CASCADE") }()
+	cfg, err := pgxpool.ParseConfig(url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.ConnConfig.RuntimeParams["search_path"] = quoted
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	repo := &postgres.Postgres{Pool: pool}
+	region := logistics.Region{ID: "test", Name: "Test", Bounds: logistics.Bounds{West: 29, South: 59, East: 31, North: 61}}
+	second := region
+	second.ID = "second"
+	release, err := repo.Initialize(ctx, []logistics.Region{region, second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if release != nil {
+			release()
+		}
+	}()
+	if unlock, err := repo.Initialize(ctx, []logistics.Region{region}); err == nil {
+		unlock()
+		t.Fatal("second server obtained exclusive worker lock")
+	}
+	service := build.NewService(repo)
+	results := make(chan build.BuildResult, 16)
+	failures := make(chan error, 16)
+	var wg sync.WaitGroup
+	for range 16 {
+		wg.Go(func() {
+			r, err := service.RequestBuild(ctx, "test")
+			if err != nil {
+				failures <- err
+				return
+			}
+			results <- r
+		})
+	}
+	wg.Wait()
+	close(results)
+	close(failures)
+	for err := range failures {
+		t.Fatal(err)
+	}
+	id := ""
+	for r := range results {
+		if id == "" {
+			id = r.JobID
+		}
+		if r.JobID != id || r.GraphID != "" {
+			t.Fatalf("request was not deduplicated: %+v", r)
+		}
+	}
+	if _, err := service.RequestBuild(ctx, "unknown"); !errors.Is(err, build.ErrNotFound) {
+		t.Fatalf("unknown region: %v", err)
+	}
+	root := filepath.Join("..", "..", "..", "testdata")
+	pipeline := network.Pipeline{Policy: logistics.DefaultFreightPolicy(), Source: osmdata.Source{Catalog: osmdata.Catalog{MaximumObjects: 1000, Regions: map[string]osmdata.Files{"test": {OSM: filepath.Join(root, "freight.osm"), References: filepath.Join(root, "references.json")}}}}}
+	manager := build.Manager{Repository: repo, Builder: pipeline, Workers: 2, PollInterval: time.Millisecond * 10, BuildTimeout: time.Second * 5}
+	workerCtx, stop := context.WithCancel(ctx)
+	done := make(chan error, 1)
+	go func() { done <- manager.Run(workerCtx) }()
+	defer stop()
+	var job build.Job
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		job, err = service.GetJob(ctx, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if job.Status == build.Completed {
+			break
+		}
+		if job.Status == build.Failed {
+			t.Fatalf("build failed: %+v", job)
+		}
+		select {
+		case <-ctx.Done():
+			t.Fatal(ctx.Err())
+		case <-ticker.C:
+		}
+	}
+	stop()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	g, err := service.GetGraph(ctx, job.GraphID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(g.Nodes) != 3 || len(g.Edges) != 1 {
+		t.Fatalf("persisted graph: %+v", g)
+	}
+	cached, err := service.RequestBuild(ctx, "test")
+	if err != nil || cached.GraphID != job.GraphID || cached.JobID != "" {
+		t.Fatalf("cache=%+v error=%v", cached, err)
+	}
+	result, err := service.RequestBuild(ctx, "second")
+	if err != nil {
+		t.Fatal(err)
+	}
+	claimed, _, err := repo.Claim(ctx)
+	if err != nil || claimed.ID != result.JobID {
+		t.Fatalf("claim=%+v err=%v", claimed, err)
+	}
+	if _, _, err := repo.Claim(ctx); !errors.Is(err, build.ErrNotFound) {
+		t.Fatalf("claimed same job twice: %v", err)
+	}
+	release()
+	release = nil
+	release, err = repo.Initialize(ctx, []logistics.Region{region, second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	recovered, err := repo.GetJob(ctx, result.JobID)
+	if err != nil || recovered.Status != build.Pending {
+		t.Fatalf("restart did not recover job: %+v %v", recovered, err)
+	}
+	claimed, _, err = repo.Claim(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Complete(ctx, claimed, g); err == nil {
+		t.Fatal("cross-region graph accepted")
+	}
+	if err := repo.Fail(ctx, claimed.ID, "test failure"); err != nil {
+		t.Fatal(err)
+	}
+	retry, err := repo.RequestBuild(ctx, "second")
+	if err != nil || retry.JobID == claimed.ID {
+		t.Fatalf("failure retry=%+v %v", retry, err)
+	}
+}
