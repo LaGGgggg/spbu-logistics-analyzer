@@ -1,0 +1,3 @@
+[
+ {"external_ids":[{"namespace":"esr","value":"123400"}],"physical_id":"station-1234","name":"Freight station","modes":["rail"],"cargo":true,"source":"synthetic freight registry for tests"}
+]
