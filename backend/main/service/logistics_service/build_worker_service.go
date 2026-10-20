@@ -107,7 +107,13 @@ func (m *WorkerService) execute(ctx context.Context, job Job, region logistics.R
 		}
 	}
 
-	saveCtx, saveCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	saveTimeout := 2 * time.Minute
+
+	if ctx.Err() != nil {
+		saveTimeout = 5 * time.Second
+	}
+
+	saveCtx, saveCancel := context.WithTimeout(context.Background(), saveTimeout)
 
 	defer saveCancel()
 
@@ -116,11 +122,21 @@ func (m *WorkerService) execute(ctx context.Context, job Job, region logistics.R
 	} else if err != nil {
 		slog.Error("build failed", "job_id", job.ID, "duration", time.Since(started), "error", err)
 		message := "Не удалось построить граф. Проверьте исходные данные и повторите попытку."
+
+		if errors.Is(err, graph_build_service.ErrDatasetLimit) {
+			message = "Превышен лимит обработки OSM-данных. Для этой области требуется увеличить лимиты или подготовить меньшую региональную выгрузку."
+		} else if errors.Is(err, context.DeadlineExceeded) {
+			message = "Построение превысило отведённое время. Проверьте BUILD_TIMEOUT и объём исходных данных."
+		}
+
 		err = m.Repository.Fail(saveCtx, job.ID, message)
 	} else {
 		err = m.Repository.Complete(saveCtx, job, result)
 
-		if err == nil {
+		if errors.Is(err, ErrGraphTooLarge) {
+			slog.Error("graph payload exceeds storage limit", "job_id", job.ID)
+			err = m.Repository.Fail(saveCtx, job.ID, "Результат графа слишком велик для сохранения. Увеличьте route_geometry_tolerance_m или уменьшите область.")
+		} else if err == nil {
 			slog.Info("build completed", "job_id", job.ID, "graph_id", result.ID, "duration", time.Since(started), "nodes", len(result.Nodes), "edges", len(result.Edges))
 		}
 	}

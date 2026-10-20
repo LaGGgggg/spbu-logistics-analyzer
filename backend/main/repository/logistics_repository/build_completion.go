@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/domain/logistics"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/service/logistics_service"
@@ -19,16 +20,6 @@ func (p *Repository) Complete(ctx context.Context, job logistics_service.Job, gr
 		return err
 	}
 
-	tx, err := p.pool.Begin(ctx)
-
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		_ = tx.Rollback(context.Background())
-	}()
-
 	if graph.Nodes == nil {
 		graph.Nodes = []logistics.LogisticsNode{}
 	}
@@ -42,6 +33,28 @@ func (p *Repository) Complete(ctx context.Context, job logistics_service.Job, gr
 	if err != nil {
 		return err
 	}
+
+	if len(payload) > 256<<20 {
+		return logistics_service.ErrGraphTooLarge
+	}
+
+	geometryPoints := 0
+
+	for _, edge := range graph.Edges {
+		geometryPoints += len(edge.Geometry)
+	}
+
+	slog.Info("graph payload prepared", "graph_id", graph.ID, "nodes", len(graph.Nodes), "edges", len(graph.Edges), "geometry_points", geometryPoints, "bytes", len(payload))
+
+	tx, err := p.pool.Begin(ctx)
+
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		_ = tx.Rollback(context.Background())
+	}()
 
 	if _, err = tx.Exec(ctx, "INSERT INTO graphs(id,region_id,payload) VALUES($1,$2,$3)", graph.ID, job.RegionID, payload); err != nil {
 		return err

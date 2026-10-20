@@ -39,6 +39,10 @@ func BenchmarkRegionalGraphBuild(b *testing.B) {
 	source := &measuredSource{source: osmdata.Source{Catalog: osmdata.Catalog{MaximumObjects: 5000000, Policy: policy, Regions: map[string]osmdata.Files{"benchmark": {OSM: path}}}}}
 	builder := graph_build_service.Service{Source: source, Policy: policy}
 	region := logistics.Region{ID: "benchmark", Name: "South Saint Petersburg", Bounds: logistics.Bounds{West: 30.10811, South: 59.80699, East: 30.48226, North: 59.93393}}
+	if os.Getenv("OSM_BENCH_REGION") == "spb-leningrad" {
+		region.Bounds = logistics.Bounds{West: 27.4, South: 58.4, East: 35.7, North: 61.4}
+		region.Name = "SPb and Leningrad region bounding box"
+	}
 	var total time.Duration
 
 	b.ReportAllocs()

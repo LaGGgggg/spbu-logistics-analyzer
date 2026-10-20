@@ -3,10 +3,13 @@ package logistics_service_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/domain/logistics"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/service/graph_build_service"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/service/logistics_service"
 )
 
@@ -19,7 +22,9 @@ func (f builderFunc) Build(ctx context.Context, r logistics.Region) (logistics.L
 type outcomeRepository struct {
 	logistics_service.Repository
 	outcome        string
+	message        string
 	saveErr        error
+	completeErr    error
 	saveContextErr error
 	cancel         context.CancelFunc
 	claimed        bool
@@ -50,10 +55,14 @@ func (r *outcomeRepository) persist(ctx context.Context, outcome string) error {
 }
 
 func (r *outcomeRepository) Complete(ctx context.Context, _ logistics_service.Job, _ logistics.LogisticsGraph) error {
+	if r.completeErr != nil {
+		return r.completeErr
+	}
 	return r.persist(ctx, "complete")
 }
 
-func (r *outcomeRepository) Fail(ctx context.Context, _, _ string) error {
+func (r *outcomeRepository) Fail(ctx context.Context, _ string, message string) error {
+	r.message = message
 	return r.persist(ctx, "fail")
 }
 
@@ -72,15 +81,26 @@ func (n *recordedUpdates) NotifyJobChanged(id string) {
 
 func TestWorkerPersistsOutcome(t *testing.T) {
 	for _, tc := range []struct {
-		name     string
-		builder  builderFunc
-		shutdown bool
-		saveErr  error
-		want     string
+		name          string
+		builder       builderFunc
+		shutdown      bool
+		saveErr       error
+		completeErr   error
+		want          string
+		publicMessage string
 	}{
 		{name: "success", builder: func(context.Context, logistics.Region) (logistics.LogisticsGraph, error) {
 			return logistics.LogisticsGraph{ID: "g", RegionID: "r"}, nil
 		}, want: "complete"},
+		{name: "data limit has actionable message", builder: func(context.Context, logistics.Region) (logistics.LogisticsGraph, error) {
+			return logistics.LogisticsGraph{}, fmt.Errorf("private filename: %w", graph_build_service.ErrDatasetLimit)
+		}, want: "fail", publicMessage: "Превышен лимит"},
+		{name: "timeout has actionable message", builder: func(context.Context, logistics.Region) (logistics.LogisticsGraph, error) {
+			return logistics.LogisticsGraph{}, context.DeadlineExceeded
+		}, want: "fail", publicMessage: "BUILD_TIMEOUT"},
+		{name: "oversized result fails job without stopping worker", builder: func(context.Context, logistics.Region) (logistics.LogisticsGraph, error) {
+			return logistics.LogisticsGraph{ID: "g", RegionID: "r"}, nil
+		}, want: "fail", completeErr: logistics_service.ErrGraphTooLarge, publicMessage: "route_geometry_tolerance_m"},
 		{name: "panic becomes failure", builder: func(context.Context, logistics.Region) (logistics.LogisticsGraph, error) {
 			panic("bad source")
 		}, want: "fail"},
@@ -99,7 +119,7 @@ func TestWorkerPersistsOutcome(t *testing.T) {
 
 			defer cancel()
 
-			repo := &outcomeRepository{saveErr: tc.saveErr, cancel: cancel}
+			repo := &outcomeRepository{saveErr: tc.saveErr, completeErr: tc.completeErr, cancel: cancel}
 			builder := builderFunc(func(buildCtx context.Context, region logistics.Region) (logistics.LogisticsGraph, error) {
 				if tc.shutdown {
 					cancel()
@@ -111,6 +131,9 @@ func TestWorkerPersistsOutcome(t *testing.T) {
 			manager := logistics_service.WorkerService{Repository: repo, Updates: updates, Builder: builder, Workers: 1, PollInterval: time.Millisecond, BuildTimeout: time.Second}
 			err := manager.Run(ctx)
 
+			if tc.publicMessage != "" && (!strings.Contains(repo.message, tc.publicMessage) || strings.Contains(repo.message, "private filename")) {
+				t.Fatalf("unsafe or unhelpful public error: %s", repo.message)
+			}
 			if repo.outcome != tc.want {
 				t.Fatalf("outcome=%s want=%s", repo.outcome, tc.want)
 			}
