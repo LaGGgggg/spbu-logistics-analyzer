@@ -24,18 +24,21 @@ type Files struct {
 }
 
 type Catalog struct {
-	OverpassURL    string                  `json:"overpass_url,omitempty"`
-	CacheDirectory string                  `json:"cache_directory,omitempty"`
-	Regions        map[string]Files        `json:"regions"`
-	Policy         logistics.FreightPolicy `json:"policy"`
-	MaximumObjects int                     `json:"maximum_objects"`
+	OverpassURL       string                  `json:"overpass_url,omitempty"`
+	CacheDirectory    string                  `json:"cache_directory,omitempty"`
+	Regions           map[string]Files        `json:"regions"`
+	Policy            logistics.FreightPolicy `json:"policy"`
+	MaximumObjects    int                     `json:"maximum_objects"`
+	MaximumIndexNodes int                     `json:"maximum_index_nodes,omitempty"`
 }
+
+const defaultMaximumIndexNodes = 50000000
 
 type Source struct{ Catalog Catalog }
 
 func LoadCatalog(path string) (Catalog, error) {
 
-	c := Catalog{Policy: logistics.DefaultFreightPolicy(), MaximumObjects: 5000000, CacheDirectory: "../var/areas"}
+	c := Catalog{Policy: logistics.DefaultFreightPolicy(), MaximumObjects: 5000000, MaximumIndexNodes: defaultMaximumIndexNodes, CacheDirectory: "../var/areas"}
 	f, err := os.Open(path)
 
 	if err != nil {
@@ -57,6 +60,10 @@ func LoadCatalog(path string) (Catalog, error) {
 
 	if c.MaximumObjects < 1 {
 		return c, fmt.Errorf("maximum_objects must be positive")
+	}
+
+	if c.MaximumIndexNodes < 1 {
+		return c, fmt.Errorf("maximum_index_nodes must be positive")
 	}
 
 	if len(c.Regions) == 0 && c.OverpassURL == "" {
@@ -151,8 +158,22 @@ func (s Source) Load(ctx context.Context, region logistics.Region) (logistics.Da
 		return logistics.Dataset{}, err
 	}
 
+	var references []logistics.Reference
+
+	if files.References != "" {
+		if err := readJSON(files.References, &references); err != nil {
+			return logistics.Dataset{}, err
+		}
+	}
+
+	indexLimit := s.Catalog.MaximumIndexNodes
+
+	if indexLimit == 0 {
+		indexLimit = defaultMaximumIndexNodes
+	}
+
 	started := time.Now()
-	dataset, err := readOSM(ctx, files.OSM, s.Catalog.MaximumObjects, region.Bounds, s.Catalog.Policy.MaximumSnapKM)
+	dataset, err := readOSM(ctx, files.OSM, s.Catalog.MaximumObjects, indexLimit, region.Bounds, s.Catalog.Policy.MaximumSnapKM, references)
 
 	if err != nil {
 		return dataset, fmt.Errorf("OSM: %w", err)
@@ -163,9 +184,7 @@ func (s Source) Load(ctx context.Context, region logistics.Region) (logistics.Da
 	dataset.Sources = []string{filepath.Base(files.OSM), "OpenStreetMap contributors (ODbL)"}
 
 	if files.References != "" {
-		if err := readJSON(files.References, &dataset.References); err != nil {
-			return dataset, err
-		}
+		dataset.References = references
 
 		filtered := dataset.References[:0]
 

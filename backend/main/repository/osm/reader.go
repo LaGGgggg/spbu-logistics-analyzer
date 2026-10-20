@@ -3,6 +3,7 @@ package osmdata
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"math"
 	"os"
 	"slices"
@@ -10,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/domain/logistics"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/service/graph_build_service"
 	"github.com/paulmach/osm"
 	"github.com/paulmach/osm/osmpbf"
 	"github.com/paulmach/osm/osmxml"
@@ -103,7 +105,11 @@ func tagsMap(tags osm.Tags) map[string]string {
 
 func candidate(t map[string]string) bool {
 
-	for _, key := range []string{"railway", "aeroway", "industrial", "building", "port", "cargo", "harbour", "man_made"} {
+	if t["building"] == "warehouse" {
+		return true
+	}
+
+	for _, key := range []string{"railway", "aeroway", "industrial", "port", "cargo", "harbour", "man_made"} {
 		if t[key] != "" {
 			return true
 		}
@@ -139,14 +145,25 @@ func trackMode(t map[string]string) (logistics.TransportMode, bool) {
 	return "", false
 }
 
-func readOSM(ctx context.Context, path string, limit int, bounds logistics.Bounds, snapKM float64) (logistics.Dataset, error) {
+func readOSM(ctx context.Context, path string, limit, indexLimit int, bounds logistics.Bounds, snapKM float64, references []logistics.Reference) (logistics.Dataset, error) {
 
 	result := logistics.Dataset{}
 	selectionBounds := bufferedBounds(bounds, snapKM)
-	localNodes, err := selectAreaNodes(ctx, path, selectionBounds, limit)
+	localNodes, err := selectAreaNodes(ctx, path, selectionBounds, indexLimit)
 
 	if err != nil {
 		return result, err
+	}
+
+	slog.Info("OSM area indexed", "nodes", len(localNodes))
+	referenced := map[logistics.ExternalID]bool{}
+	for _, ref := range references {
+		for _, id := range ref.ExternalIDs {
+			referenced[id] = true
+		}
+	}
+	relevant := func(tags map[string]string, namespace logistics.ExternalNamespace, id int64) bool {
+		return candidate(tags) || referenced[logistics.ExternalID{Namespace: namespace, Value: strconv.FormatInt(id, 10)}]
 	}
 
 	ways := map[osm.WayID]*osm.Way{}
@@ -159,7 +176,7 @@ func readOSM(ctx context.Context, path string, limit int, bounds logistics.Bound
 		count++
 
 		if count > limit {
-			return fmt.Errorf("OSM selection exceeds maximum_objects=%d", limit)
+			return fmt.Errorf("%w: OSM selection exceeds maximum_objects=%d", graph_build_service.ErrDatasetLimit, limit)
 		}
 
 		return nil
@@ -190,7 +207,7 @@ func readOSM(ctx context.Context, path string, limit int, bounds logistics.Bound
 	err = scan(ctx, path, relationObjects, nil, func(obj osm.Object) error {
 		o, ok := obj.(*osm.Relation)
 
-		if !ok || !candidate(tagsMap(o.Tags)) || (o.Tags.Find("type") != "multipolygon" && o.Tags.Find("type") != "site") {
+		if !ok || !relevant(tagsMap(o.Tags), logistics.ExternalOSMRelation, int64(o.ID)) || (o.Tags.Find("type") != "multipolygon" && o.Tags.Find("type") != "site") {
 			return nil
 		}
 
@@ -230,10 +247,12 @@ func readOSM(ctx context.Context, path string, limit int, bounds logistics.Bound
 		t := tagsMap(way.Tags)
 		_, network := trackMode(t)
 
-		if !network && !candidate(t) && !wantedWays[id] {
+		if !network && !relevant(t, logistics.ExternalOSMWay, int64(id)) && !wantedWays[id] {
 			delete(ways, id)
 		}
 	}
+
+	slog.Info("OSM ways selected", "ways", len(ways), "relations", len(relations))
 
 	missingWays := map[osm.WayID]bool{}
 
@@ -268,7 +287,7 @@ func readOSM(ctx context.Context, path string, limit int, bounds logistics.Bound
 			wantedNodes[nd.ID] = true
 
 			if len(wantedNodes) > limit {
-				return result, fmt.Errorf("OSM node selection exceeds maximum_objects=%d", limit)
+				return result, fmt.Errorf("%w: OSM node selection exceeds maximum_objects=%d", graph_build_service.ErrDatasetLimit, limit)
 			}
 		}
 	}
@@ -299,7 +318,7 @@ func readOSM(ctx context.Context, path string, limit int, bounds logistics.Bound
 
 		t := tagsMap(node.Tags)
 
-		if inside(selectionBounds, coordinate) && candidate(t) {
+		if inside(selectionBounds, coordinate) && relevant(t, logistics.ExternalOSMNode, int64(node.ID)) {
 			if err := check(); err != nil {
 				return err
 			}
@@ -363,7 +382,7 @@ func readOSM(ctx context.Context, path string, limit int, bounds logistics.Bound
 			result.Tracks = append(result.Tracks, logistics.Track{ID: fmt.Sprintf("osm_way:%d", id), Mode: mode, Points: geometry, OneWay: directed})
 		}
 
-		if candidate(t) {
+		if relevant(t, logistics.ExternalOSMWay, int64(id)) {
 			result.Features = append(result.Features, logistics.Feature{ExternalID: logistics.ExternalID{Namespace: logistics.ExternalOSMWay, Value: strconv.FormatInt(int64(id), 10)}, Coordinates: center(geometry), Tags: t, AreaM2: area(geometry)})
 		}
 	}
