@@ -11,10 +11,19 @@ import (
 
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/domain/logistics"
 	"github.com/paulmach/osm"
+	"github.com/paulmach/osm/osmpbf"
 	"github.com/paulmach/osm/osmxml"
 )
 
-func scan(ctx context.Context, path string, visit func(osm.Object) error) error {
+type objectKinds uint8
+
+const (
+	nodeObjects objectKinds = 1 << iota
+	wayObjects
+	relationObjects
+)
+
+func scan(ctx context.Context, path string, kinds objectKinds, visit func(osm.Object) error) error {
 
 	f, err := os.Open(path)
 
@@ -27,13 +36,13 @@ func scan(ctx context.Context, path string, visit func(osm.Object) error) error 
 	var scanner osm.Scanner
 
 	if strings.HasSuffix(path, ".pbf") {
-		scanner, err = NewPBFScanner(ctx, f, 2)
+		pbf := osmpbf.New(ctx, f, 2)
+		pbf.SkipNodes = kinds&nodeObjects == 0
+		pbf.SkipWays = kinds&wayObjects == 0
+		pbf.SkipRelations = kinds&relationObjects == 0
+		scanner = pbf
 	} else {
 		scanner = osmxml.New(ctx, f)
-	}
-
-	if err != nil {
-		return err
 	}
 
 	defer scanner.Close()
@@ -43,7 +52,24 @@ func scan(ctx context.Context, path string, visit func(osm.Object) error) error 
 			return err
 		}
 
-		if err := visit(scanner.Object()); err != nil {
+		object := scanner.Object()
+
+		switch object.(type) {
+		case *osm.Node:
+			if kinds&nodeObjects == 0 {
+				continue
+			}
+		case *osm.Way:
+			if kinds&wayObjects == 0 {
+				continue
+			}
+		case *osm.Relation:
+			if kinds&relationObjects == 0 {
+				continue
+			}
+		}
+
+		if err := visit(object); err != nil {
 			return err
 		}
 	}
@@ -100,9 +126,16 @@ func trackMode(t map[string]string) (logistics.TransportMode, bool) {
 	return "", false
 }
 
-func readOSM(ctx context.Context, path string, limit int) (logistics.Dataset, error) {
+func readOSM(ctx context.Context, path string, limit int, bounds logistics.Bounds, snapKM float64) (logistics.Dataset, error) {
 
 	result := logistics.Dataset{}
+	selectionBounds := bufferedBounds(bounds, snapKM)
+	localNodes, err := selectAreaNodes(ctx, path, selectionBounds, limit)
+
+	if err != nil {
+		return result, err
+	}
+
 	ways := map[osm.WayID]*osm.Way{}
 	relations := []*osm.Relation{}
 	wantedWays := map[osm.WayID]bool{}
@@ -118,32 +151,14 @@ func readOSM(ctx context.Context, path string, limit int) (logistics.Dataset, er
 
 		return nil
 	}
-	err := scan(ctx, path, func(obj osm.Object) error {
-		switch o := obj.(type) {
-		case *osm.Way:
-			t := tagsMap(o.Tags)
-			_, network := trackMode(t)
-
-			if network || candidate(t) {
+	err = scan(ctx, path, wayObjects, func(obj osm.Object) error {
+		if o, ok := obj.(*osm.Way); ok {
+			if touchesArea(o, localNodes) {
 				if err := check(); err != nil {
 					return err
 				}
 
 				ways[o.ID] = o
-			}
-		case *osm.Relation:
-			if candidate(tagsMap(o.Tags)) && (o.Tags.Find("type") == "multipolygon" || o.Tags.Find("type") == "site") {
-				if err := check(); err != nil {
-					return err
-				}
-
-				relations = append(relations, o)
-
-				for _, member := range o.Members {
-					if member.Type == osm.TypeWay && member.Role != "inner" {
-						wantedWays[osm.WayID(member.Ref)] = true
-					}
-				}
 			}
 		}
 
@@ -154,8 +169,57 @@ func readOSM(ctx context.Context, path string, limit int) (logistics.Dataset, er
 		return result, err
 	}
 
+	// Select relations after ways so selection also works for unordered XML.
+	err = scan(ctx, path, relationObjects, func(obj osm.Object) error {
+		o, ok := obj.(*osm.Relation)
+
+		if !ok || !candidate(tagsMap(o.Tags)) || (o.Tags.Find("type") != "multipolygon" && o.Tags.Find("type") != "site") {
+			return nil
+		}
+
+		selected := false
+
+		for _, member := range o.Members {
+			if member.Type == osm.TypeWay && member.Role != "inner" && ways[osm.WayID(member.Ref)] != nil {
+				selected = true
+				break
+			}
+		}
+
+		if !selected {
+			return nil
+		}
+
+		if err := check(); err != nil {
+			return err
+		}
+
+		relations = append(relations, o)
+
+		for _, member := range o.Members {
+			if member.Type == osm.TypeWay && member.Role != "inner" {
+				wantedWays[osm.WayID(member.Ref)] = true
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return result, err
+	}
+
+	for id, way := range ways {
+		t := tagsMap(way.Tags)
+		_, network := trackMode(t)
+
+		if !network && !candidate(t) && !wantedWays[id] {
+			delete(ways, id)
+		}
+	}
+
 	if len(wantedWays) > 0 {
-		if err := scan(ctx, path, func(obj osm.Object) error {
+		if err := scan(ctx, path, wayObjects, func(obj osm.Object) error {
 			if way, ok := obj.(*osm.Way); ok && wantedWays[way.ID] && ways[way.ID] == nil {
 				if err := check(); err != nil {
 					return err
@@ -173,14 +237,17 @@ func readOSM(ctx context.Context, path string, limit int) (logistics.Dataset, er
 	for _, way := range ways {
 		for _, nd := range way.Nodes {
 			wantedNodes[nd.ID] = true
+
+			if len(wantedNodes) > limit {
+				return result, fmt.Errorf("OSM node selection exceeds maximum_objects=%d", limit)
+			}
 		}
 	}
 
-	if len(wantedNodes) > limit {
-		return result, fmt.Errorf("OSM node selection exceeds maximum_objects=%d", limit)
-	}
+	// Release the spatial index before loading complete way geometries.
+	localNodes = nil
 
-	err = scan(ctx, path, func(obj osm.Object) error {
+	err = scan(ctx, path, nodeObjects, func(obj osm.Object) error {
 		node, ok := obj.(*osm.Node)
 
 		if !ok {
@@ -199,7 +266,7 @@ func readOSM(ctx context.Context, path string, limit int) (logistics.Dataset, er
 
 		t := tagsMap(node.Tags)
 
-		if candidate(t) {
+		if inside(selectionBounds, coordinate) && candidate(t) {
 			if err := check(); err != nil {
 				return err
 			}
@@ -303,6 +370,8 @@ func readOSM(ctx context.Context, path string, limit int) (logistics.Dataset, er
 
 		result.Features = append(result.Features, logistics.Feature{ExternalID: logistics.ExternalID{Namespace: logistics.ExternalOSMRelation, Value: strconv.FormatInt(int64(rel.ID), 10)}, Coordinates: center(geometry), Tags: tagsMap(rel.Tags)})
 	}
+
+	result.Warnings = append(result.Warnings, "OSM network limited to ways with a node in the selected bounds and snap buffer; routes leaving this network may be unavailable")
 
 	return result, nil
 }

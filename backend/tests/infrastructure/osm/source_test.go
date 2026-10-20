@@ -36,7 +36,7 @@ func TestDownloadIsAtomicAndCached(t *testing.T) {
 
 	path := filepath.Join(t.TempDir(), "extract.osm")
 	files := osmdata.Files{OSM: path, URL: server.URL, SHA256: fmt.Sprintf("%x", sha256.Sum256(fixture))}
-	region := logistics.Region{ID: "r"}
+	region := logistics.Region{ID: "r", Bounds: logistics.Bounds{West: 29, South: 59, East: 32, North: 61}}
 	load := func(files osmdata.Files) error {
 		source := osmdata.Source{Catalog: osmdata.Catalog{MaximumObjects: 1000, Regions: map[string]osmdata.Files{"r": files}}}
 		_, err := source.Load(context.Background(), region)
@@ -114,7 +114,7 @@ func TestIncompleteWayDoesNotCreateShortcut(t *testing.T) {
 	}
 
 	source := osmdata.Source{Catalog: osmdata.Catalog{MaximumObjects: 100, Regions: map[string]osmdata.Files{"r": {OSM: path}}}}
-	dataset, err := source.Load(context.Background(), logistics.Region{ID: "r"})
+	dataset, err := source.Load(context.Background(), logistics.Region{ID: "r", Bounds: logistics.Bounds{West: 29, South: 59, East: 32, North: 61}})
 
 	if err != nil {
 		t.Fatal(err)

@@ -54,7 +54,7 @@ func (s Source) ResolveArea(ctx context.Context, b logistics.Bounds) (logistics_
 		Policy    logistics.FreightPolicy
 		URL       string
 		Algorithm string
-	}{s.Catalog.Regions[id], s.Catalog.Policy, s.Catalog.OverpassURL, "area-v1"})
+	}{s.Catalog.Regions[id], s.Catalog.Policy, s.Catalog.OverpassURL, "area-v2-bounded-osm"})
 
 	return logistics_service.AreaSource{ID: id, Version: fmt.Sprintf("%x", sha256.Sum256(version))}, nil
 }

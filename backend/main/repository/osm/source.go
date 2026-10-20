@@ -106,6 +106,10 @@ func LoadCatalog(path string) (Catalog, error) {
 
 func (s Source) Load(ctx context.Context, region logistics.Region) (logistics.Dataset, error) {
 
+	if err := region.Bounds.Validate(); err != nil {
+		return logistics.Dataset{}, fmt.Errorf("OSM selection bounds: %w", err)
+	}
+
 	if region.SourceVersion != "" {
 		selected, err := s.ResolveArea(ctx, region.Bounds)
 
@@ -145,7 +149,7 @@ func (s Source) Load(ctx context.Context, region logistics.Region) (logistics.Da
 		return logistics.Dataset{}, err
 	}
 
-	dataset, err := readOSM(ctx, files.OSM, s.Catalog.MaximumObjects)
+	dataset, err := readOSM(ctx, files.OSM, s.Catalog.MaximumObjects, region.Bounds, s.Catalog.Policy.MaximumSnapKM)
 
 	if err != nil {
 		return dataset, fmt.Errorf("OSM: %w", err)
