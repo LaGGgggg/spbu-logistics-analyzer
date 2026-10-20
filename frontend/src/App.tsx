@@ -1,29 +1,25 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Activity,
   ArrowDownToLine,
+  ArrowLeft,
   ArrowRight,
   ArrowUpRight,
-  BookOpen,
   Check,
   ChevronDown,
   ChevronRight,
-  CircleHelp,
   Code2,
   Copy,
-  Database,
   Download,
-  ExternalLink,
   FileJson,
+  FolderOpen,
   Globe2,
   Hexagon,
   Layers3,
   LoaderCircle,
   Map,
   MapPin,
-  Network,
   Play,
-  RefreshCw,
   Route,
   Settings2,
   Square,
@@ -66,6 +62,28 @@ const initialBounds = {
 function App() {
   const app = useLogistics();
   const [tab, setTab] = useState<Tab>("map");
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
+  const toolsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!toolsOpen) return;
+    const outside = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        !toolsRef.current?.contains(event.target)
+      )
+        setToolsOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setToolsOpen(false);
+    };
+    document.addEventListener("pointerdown", outside);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", outside);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [toolsOpen]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [areaMode, setAreaMode] = useState(false);
   const [regionId, setRegionId] = useState("");
@@ -101,11 +119,12 @@ function App() {
     : { region_id: selectedRegionId };
   const currentCoverage =
     coverage?.id === app.graph.id ? coverage.value : app.graph.coverage;
-  const title =
-    app.source === "example"
-      ? "Санкт-Петербург"
-      : app.regions.find((r) => r.id === app.graph.region_id)?.name ||
-        "Пользовательская область";
+  const connectionLabel =
+    app.health === "online"
+      ? "Сервис доступен"
+      : app.health === "checking"
+        ? "Проверка соединения"
+        : "Сервис недоступен";
   const totalKM = app.viewGraph.edges.reduce(
     (sum, edge) => sum + edge.distance_km,
     0,
@@ -173,48 +192,196 @@ function App() {
             <Waypoints size={23} strokeWidth={2} />
           </span>
           <span>
-            logistics<span className="brand-light">atlas</span>
-            <small>NETWORK EXPLORER</small>
+            <span className="brand-main">logistics</span>
+            <span className="brand-light">atlas</span>
           </span>
         </a>
-        <nav className="top-nav" aria-label="Главная навигация">
-          <button
-            className={tab !== "api" ? "active" : ""}
-            onClick={() => setTab("map")}
-          >
-            <Network size={15} /> Рабочая область
-          </button>
-          <button
-            className={tab === "api" ? "active" : ""}
-            onClick={() => setTab("api")}
-          >
-            <Code2 size={15} /> API и отладка
-          </button>
-        </nav>
         <div className="header-right">
           <button
-            className={`connection-pill ${app.health}`}
+            className={`connection-indicator ${app.health}`}
+            aria-label={connectionLabel}
+            title={`${connectionLabel}. Проверить соединение`}
             onClick={() => void app.checkConnection()}
-            title="Повторно проверить /health и /api/regions"
           >
+            <Activity size={17} />
             <i />
-            {app.health === "online"
-              ? "Backend подключён"
-              : app.health === "checking"
-                ? "Подключение…"
-                : "Backend недоступен"}
-            <RefreshCw size={11} />
           </button>
-          <span className="header-divider" />
-          <span className="workspace-avatar">SP</span>
+          <div className="title-actions">
+            <button
+              className="secondary-button"
+              title="Скопировать ссылку на текущий результат"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(location.href);
+                  setCopied(true);
+                  window.setTimeout(() => setCopied(false), 1800);
+                } catch {
+                  notify("Скопируйте адрес из строки браузера.");
+                }
+              }}
+            >
+              {copied ? <Check size={14} /> : <Copy size={14} />}
+              {copied ? "Скопировано" : "Ссылка"}
+            </button>
+            <div className="export-wrapper">
+              <button
+                className="dark-button"
+                onClick={() => setExportOpen(!exportOpen)}
+                disabled={!!exporting}
+              >
+                <Download size={15} />
+                {exporting ? "Загрузка…" : "Экспорт"}
+                <ChevronDown size={13} />
+              </button>
+              {exportOpen && (
+                <>
+                  <button
+                    className="dropdown-backdrop"
+                    aria-label="Закрыть меню экспорта"
+                    onClick={() => setExportOpen(false)}
+                  />
+                  <div className="export-menu">
+                    <div className="menu-label">
+                      {app.source === "example"
+                        ? "ЛОКАЛЬНЫЙ ПРИМЕР"
+                        : "ПОЛНЫЙ ГРАФ BACKEND"}
+                    </div>
+                    {app.source === "example" ? (
+                      <>
+                        <p>
+                          Серверные форматы станут доступны после построения.
+                        </p>
+                        <button
+                          onClick={() => {
+                            saveFile(
+                              new Blob([JSON.stringify(app.graph, null, 2)], {
+                                type: "application/json",
+                              }),
+                              "example-graph.json",
+                            );
+                            setExportOpen(false);
+                          }}
+                        >
+                          <FileJson size={15} /> JSON примера
+                          <ArrowDownToLine size={14} />
+                        </button>
+                      </>
+                    ) : (
+                      exportFormats.map((format) => (
+                        <button
+                          key={format}
+                          onClick={() => void download(format)}
+                        >
+                          <FileJson size={15} />
+                          {format}
+                          <ArrowDownToLine size={14} />
+                        </button>
+                      ))
+                    )}
+                    {app.mode !== "all" && (
+                      <p>Экспортируется весь граф, без фильтра.</p>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="tools-wrapper" ref={toolsRef}>
+            <button
+              className={`icon-button tools-trigger ${toolsOpen ? "active" : ""}`}
+              aria-label="Инструменты"
+              aria-expanded={toolsOpen}
+              aria-controls="workspace-tools"
+              title="Инструменты"
+              onClick={() => setToolsOpen(!toolsOpen)}
+            >
+              <Settings2 size={19} />
+            </button>
+            {toolsOpen && (
+              <div className="utility-menu" id="workspace-tools">
+                <button
+                  onClick={() => {
+                    setTab("api");
+                    setToolsOpen(false);
+                  }}
+                  aria-label="Открыть API"
+                >
+                  <Code2 size={17} />
+                  <span>Справка API</span>
+                  <ArrowUpRight size={14} />
+                </button>
+                <button
+                  onClick={() => {
+                    setShowDebug(!showDebug);
+                    setToolsOpen(false);
+                  }}
+                  aria-pressed={showDebug}
+                >
+                  <Terminal size={17} />
+                  <span>Консоль запросов</span>
+                  {showDebug && <Check size={14} />}
+                </button>
+                <details className="open-result">
+                  <summary>
+                    <FolderOpen size={17} />
+                    Открыть по ID
+                    <ChevronDown size={14} />
+                  </summary>
+                  <form
+                    className="open-form"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      setSelected(null);
+                      setToolsOpen(false);
+                      void app.open(existingId, existingKind);
+                    }}
+                  >
+                    <label className="utility-field">
+                      Тип результата
+                      <select
+                        aria-label="Тип результата"
+                        value={existingKind}
+                        onChange={(event) =>
+                          setExistingKind(event.target.value as "graph" | "job")
+                        }
+                      >
+                        <option value="graph">Результат расчёта</option>
+                        <option value="job">Фоновое построение</option>
+                      </select>
+                    </label>
+                    <div className="id-input">
+                      <input
+                        aria-label="Идентификатор результата"
+                        placeholder={
+                          existingKind === "graph"
+                            ? "Введите graph_id"
+                            : "Введите job_id"
+                        }
+                        value={existingId}
+                        onChange={(e) => setExistingId(e.target.value)}
+                        maxLength={128}
+                      />
+                      <button
+                        aria-label="Открыть по ID"
+                        title="Открыть по ID"
+                        disabled={!existingId.trim() || app.busy}
+                      >
+                        <ArrowRight size={16} />
+                      </button>
+                    </div>
+                  </form>
+                </details>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
       <div className="workspace-layout">
         <aside className={`sidebar ${settingsOpen ? "mobile-open" : ""}`}>
           <div className="sidebar-title">
-            <span className="eyebrow">НОВОЕ ИССЛЕДОВАНИЕ</span>
-            <Settings2 className="desktop-settings-icon" size={15} />
+            <h2>Территория</h2>
             <button
               className="mobile-settings-button"
               onClick={() => setSettingsOpen(!settingsOpen)}
@@ -224,10 +391,6 @@ function App() {
               <ChevronDown size={14} />
             </button>
           </div>
-          <h2>Территория анализа</h2>
-          <p className="sidebar-description">
-            От исходных данных — к связям транспортной инфраструктуры.
-          </p>
           <div className="segmented" aria-label="Способ выбора территории">
             <button
               className={!areaMode ? "active" : ""}
@@ -244,14 +407,11 @@ function App() {
           </div>
           {areaMode ? (
             <div className="area-form">
-              <div className="field-label">
-                Границы области <span>WGS84</span>
-              </div>
+              <div className="field-label">Координаты</div>
               <div className="coordinate-grid">
                 {(["west", "east", "south", "north"] as const).map((key) => (
                   <label key={key}>
                     {fieldNames[key]}
-                    <span>{key}</span>
                     <input
                       type="number"
                       step="any"
@@ -288,7 +448,7 @@ function App() {
           ) : (
             <div className="region-form">
               <label className="field-label" htmlFor="region-select">
-                Регион <span>{app.regions.length} в каталоге</span>
+                Регион
               </label>
               <div className="select-wrap">
                 <Globe2 size={16} />
@@ -311,29 +471,8 @@ function App() {
                 </select>
                 <ChevronDown size={13} />
               </div>
-              <div className="region-note">
-                <MapPin size={13} />
-                <span>
-                  {app.regions.find((r) => r.id === selectedRegionId)?.id ||
-                    "GET /api/regions"}
-                </span>
-                <span className="tiny-tag">OSM</span>
-              </div>
             </div>
           )}
-          <div className="source-card">
-            <div>
-              <Database size={15} />
-              <b>OpenStreetMap</b>
-              <span className="source-indicator" />
-            </div>
-            <p>
-              Региональная выгрузка или Overpass. Источник подбирает backend.
-            </p>
-            <span>
-              XML / PBF <i /> Кэширование
-            </span>
-          </div>
           <button
             className="primary-button build-button"
             onClick={() => void startBuild()}
@@ -347,10 +486,6 @@ function App() {
             {app.busy ? "Построение графа…" : "Построить граф"}
             {!app.busy && <ArrowRight size={16} />}
           </button>
-          <p className="build-help">
-            Первое построение может потребовать загрузки большой выгрузки.
-            Задание выполняется в фоне.
-          </p>
           {(app.busy || app.pendingJobId || app.job) && (
             <div className="job-card" aria-live="polite">
               <div>
@@ -369,9 +504,10 @@ function App() {
                         : "Ожидание приостановлено"}
                 </b>
               </div>
-              <code>
-                {app.pendingJobId || app.job?.id || "POST /api/graphs"}
-              </code>
+              <details className="job-details">
+                <summary>Подробнее</summary>
+                <code>{app.pendingJobId || app.job?.id}</code>
+              </details>
               {app.busy ? (
                 <button className="text-button" onClick={app.stopWaiting}>
                   Прекратить ожидание
@@ -384,56 +520,9 @@ function App() {
                   Продолжить ожидание <ArrowRight size={13} />
                 </button>
               ) : null}
-              <p>Остановка ожидания не отменяет задание на сервере.</p>
             </div>
           )}
-          <div className="sidebar-divider" />
-          <div className="sidebar-subheading">УЖЕ ЕСТЬ РЕЗУЛЬТАТ?</div>
-          <form
-            className="open-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              setSelected(null);
-              void app.open(existingId, existingKind);
-            }}
-          >
-            <div className="open-kind">
-              <button
-                type="button"
-                className={existingKind === "graph" ? "active" : ""}
-                onClick={() => setExistingKind("graph")}
-              >
-                Граф
-              </button>
-              <button
-                type="button"
-                className={existingKind === "job" ? "active" : ""}
-                onClick={() => setExistingKind("job")}
-              >
-                Задание
-              </button>
-            </div>
-            <div className="id-input">
-              <input
-                aria-label="Идентификатор результата"
-                placeholder={
-                  existingKind === "graph"
-                    ? "Введите graph_id"
-                    : "Введите job_id"
-                }
-                value={existingId}
-                onChange={(e) => setExistingId(e.target.value)}
-                maxLength={128}
-              />
-              <button
-                aria-label="Открыть по ID"
-                title="Открыть по ID"
-                disabled={!existingId.trim() || app.busy}
-              >
-                <ArrowRight size={16} />
-              </button>
-            </div>
-          </form>
+
           <button
             className="example-card"
             onClick={() => {
@@ -447,123 +536,27 @@ function App() {
             </span>
             <span>
               <b>Посмотреть пример</b>
-              <small>Без загрузки данных</small>
             </span>
             <ChevronRight size={16} />
           </button>
-          <div className="sidebar-bottom">
-            <BookOpen size={14} />
-            <span>Go + Gin · PostgreSQL</span>
-            <button
-              className="icon-button"
-              title="Открыть справку API"
-              aria-label="Открыть справку API"
-              onClick={() => setTab("api")}
-            >
-              <CircleHelp size={15} />
-            </button>
-          </div>
         </aside>
 
         <main className="main-workspace">
-          <div className="workspace-breadcrumb">
-            <span>Исследования</span>
-            <ChevronRight size={12} />
-            <span>Транспортная сеть</span>
-            <span className="workspace-version">WORKSPACE / 01</span>
-          </div>
-          <div className="workspace-title">
-            <div>
-              <div className="title-label">ЛОГИСТИЧЕСКИЙ ГРАФ</div>
-              <h1>
-                {title}
-                <span className="title-dot">.</span>
-              </h1>
-              <p>
-                Исследуйте инфраструктуру, связи и качество исходных данных.
-              </p>
-            </div>
-            <div className="title-actions">
-              <button
-                className="secondary-button"
-                title="Скопировать ссылку на текущий результат"
-                onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(location.href);
-                    setCopied(true);
-                    window.setTimeout(() => setCopied(false), 1800);
-                  } catch {
-                    notify("Скопируйте адрес из строки браузера.");
-                  }
-                }}
-              >
-                {copied ? <Check size={14} /> : <Copy size={14} />}
-                {copied ? "Скопировано" : "Ссылка"}
+          <h1 className="sr-only">Карта логистической инфраструктуры</h1>
+          {app.health === "offline" && (
+            <div className="offline-notice" role="status">
+              <TriangleAlert size={15} />
+              Нет соединения с сервером
+              <button onClick={() => void app.checkConnection()}>
+                Повторить
               </button>
-              <div className="export-wrapper">
-                <button
-                  className="dark-button"
-                  onClick={() => setExportOpen(!exportOpen)}
-                  disabled={!!exporting}
-                >
-                  <Download size={15} />
-                  {exporting ? "Загрузка…" : "Экспорт"}
-                  <ChevronDown size={13} />
-                </button>
-                {exportOpen && (
-                  <>
-                    <button
-                      className="dropdown-backdrop"
-                      aria-label="Закрыть меню экспорта"
-                      onClick={() => setExportOpen(false)}
-                    />
-                    <div className="export-menu">
-                      <div className="menu-label">
-                        {app.source === "example"
-                          ? "ЛОКАЛЬНЫЙ ПРИМЕР"
-                          : "ПОЛНЫЙ ГРАФ BACKEND"}
-                      </div>
-                      {app.source === "example" ? (
-                        <>
-                          <p>
-                            Серверные форматы станут доступны после построения.
-                          </p>
-                          <button
-                            onClick={() => {
-                              saveFile(
-                                new Blob([JSON.stringify(app.graph, null, 2)], {
-                                  type: "application/json",
-                                }),
-                                "example-graph.json",
-                              );
-                              setExportOpen(false);
-                            }}
-                          >
-                            <FileJson size={15} /> JSON примера
-                            <ArrowDownToLine size={14} />
-                          </button>
-                        </>
-                      ) : (
-                        exportFormats.map((format) => (
-                          <button
-                            key={format}
-                            onClick={() => void download(format)}
-                          >
-                            <FileJson size={15} />
-                            {format}
-                            <ArrowDownToLine size={14} />
-                          </button>
-                        ))
-                      )}
-                      {app.mode !== "all" && (
-                        <p>Экспортируется весь граф, без фильтра.</p>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
             </div>
-          </div>
+          )}
+          {tab === "api" && (
+            <button className="back-to-map" onClick={() => setTab("map")}>
+              <ArrowLeft size={15} />К карте
+            </button>
+          )}
           {app.error && (
             <div className="error-banner" role="alert">
               <TriangleAlert size={17} />
@@ -583,7 +576,7 @@ function App() {
                 <Waypoints size={20} />
               </span>
               <div>
-                <span>Узлы сети</span>
+                <span>Узлы</span>
                 <strong>{formatNumber(app.viewGraph.nodes.length)}</strong>
               </div>
               <span className="stat-caption">объектов</span>
@@ -593,7 +586,7 @@ function App() {
                 <Route size={20} />
               </span>
               <div>
-                <span>Транспортные связи</span>
+                <span>Связи</span>
                 <strong>{formatNumber(app.viewGraph.edges.length)}</strong>
               </div>
               <span className="stat-caption">дуг</span>
@@ -603,7 +596,7 @@ function App() {
                 <Layers3 size={20} />
               </span>
               <div>
-                <span>Виды транспорта</span>
+                <span>Транспорт</span>
                 <strong>
                   {app.mode === "all" ? availableModes.length : 1}
                   <small> / 5</small>
@@ -616,7 +609,7 @@ function App() {
                 <Activity size={20} />
               </span>
               <div>
-                <span>Сумма длин дуг</span>
+                <span>Длина, км</span>
                 <strong>{formatNumber(totalKM)}</strong>
               </div>
               <span className="stat-caption">км</span>
@@ -634,7 +627,6 @@ function App() {
                       label: "Качество данных",
                       icon: ShieldIcon,
                     },
-                    { id: "api", label: "API", icon: Code2 },
                   ] as const
                 ).map((item) => (
                   <button
@@ -665,7 +657,6 @@ function App() {
             </div>
             {(tab === "map" || tab === "nodes") && (
               <div className="transport-toolbar">
-                <span className="toolbar-label">ТРАНСПОРТ</span>
                 <button
                   className={app.mode === "all" ? "active" : ""}
                   disabled={app.busy}
@@ -730,37 +721,13 @@ function App() {
                 onError={app.setError}
               />
             )}
-            <footer className="graph-footer">
-              <span>
-                <i className="live-dot" />
-                {app.source === "example" ? (
-                  "Иллюстративная топология · не результат расчёта"
-                ) : (
-                  <>
-                    <span className="graph-id-label">graph_id</span>{" "}
-                    <code>{app.graph.id}</code>
-                  </>
-                )}
-              </span>
-              <span>
-                {app.source === "example"
-                  ? "12 объектов · Санкт-Петербург"
-                  : "Геометрия и расстояния из backend"}
-                <ExternalLink size={11} />
-              </span>
-            </footer>
           </section>
-          <DebugPanel example={app.source === "example"} />
-          <footer className="workspace-footer">
-            <span>
-              <Network size={13} /> LOGISTICS ATLAS <i /> Инфраструктура в
-              деталях
-            </span>
-            <button onClick={() => setTab("api")}>
-              <Terminal size={12} /> Документация API
-              <ArrowUpRight size={12} />
-            </button>
-          </footer>
+          {showDebug && (
+            <DebugPanel
+              example={app.source === "example"}
+              onClose={() => setShowDebug(false)}
+            />
+          )}
         </main>
       </div>
       {toast && (

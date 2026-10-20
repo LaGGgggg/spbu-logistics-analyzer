@@ -42,7 +42,9 @@ test("example is clearly labelled, supports node inspection and never starts a b
     return route.fulfill({ json: {} });
   });
   await page.goto("/");
-  await expect(page.getByText("Backend подключён")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Сервис доступен", exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("Пример · локальные данные")).toBeVisible();
   await page.getByRole("tab", { name: "Узлы" }).click();
   await page.getByRole("textbox", { name: "Поиск узла" }).fill("Автово");
@@ -117,6 +119,10 @@ test("build, long poll, filter via API, read coverage and export", async ({
   await page
     .getByRole("button", { name: "Железная дорога", exact: true })
     .click();
+  await page.getByRole("button", { name: "Инструменты", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Консоль запросов", exact: true })
+    .click();
   await expect(
     page.locator(".request-path").filter({ hasText: "?mode=rail" }),
   ).toBeVisible();
@@ -190,12 +196,18 @@ test("validates bounds and surfaces backend errors without replacing the example
     "Для этой области нет источника данных.",
   );
   await expect(page.getByText("Пример · локальные данные")).toBeVisible();
+  await page.getByRole("button", { name: "Инструменты", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Консоль запросов", exact: true })
+    .click();
   await expect(
     page.locator(".http-status.failure").filter({ hasText: "422" }),
   ).toBeVisible();
 });
 
-test("stopping long polling leaves the server job resumable", async ({ page }) => {
+test("stopping long polling leaves the server job resumable", async ({
+  page,
+}) => {
   await base(page);
   let completed = false;
   await page.route("**/api/graphs", (route) =>
@@ -243,8 +255,11 @@ test("offline state is honest and API reference stays usable on mobile", async (
   );
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await expect(page.getByText("Backend недоступен")).toBeAttached();
-  await page.getByRole("tab", { name: "API", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Сервис недоступен", exact: true }),
+  ).toBeAttached();
+  await page.getByRole("button", { name: "Инструменты", exact: true }).click();
+  await page.getByRole("button", { name: "Открыть API", exact: true }).click();
   await expect(page.getByText("API, которое стоит за картой")).toBeVisible();
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "OpenAPI 3.1" }).click();
@@ -336,6 +351,99 @@ test("opening the example does not cancel an in-flight connection check", async 
   });
   await page.goto("/");
   await page.getByRole("button", { name: /Посмотреть пример/ }).click();
-  await expect(page.getByText("Backend подключён")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Сервис доступен", exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("Пример · локальные данные")).toBeVisible();
+});
+
+test("glass workspace keeps map controls visible and technical tools on demand", async ({
+  page,
+}, testInfo) => {
+  await base(page);
+  if (process.env.CAPTURE_REAL_MAP === "1")
+    await page.unroute("https://tile.openstreetmap.org/**");
+  await page.goto("/");
+  if (process.env.CAPTURE_REAL_MAP === "1")
+    await expect(page.locator(".leaflet-tile-loaded").first()).toBeVisible({
+      timeout: 12000,
+    });
+  await expect(
+    page.getByRole("button", { name: "Сервис доступен", exact: true }),
+  ).toBeVisible();
+  for (const text of [
+    "ЛОГИСТИЧЕСКИЙ ГРАФ",
+    "Пользовательская область",
+    "Исследуйте инфраструктуру, связи и качество исходных данных.",
+    "API и отладка",
+    "Backend подключён",
+    "От исходных данных — к связям транспортной инфраструктуры.",
+    "УЖЕ ЕСТЬ РЕЗУЛЬТАТ?",
+  ]) {
+    await expect(page.getByText(text, { exact: true })).toHaveCount(0);
+  }
+  await expect(
+    page.getByRole("region", { name: "Консоль API", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.getByLabel("Идентификатор результата")).toHaveCount(0);
+  const surface = await page
+    .locator(".sidebar")
+    .evaluate((el) => getComputedStyle(el).backdropFilter);
+  expect(surface).toContain("blur");
+  await page.screenshot({
+    path: testInfo.outputPath("glass-desktop.png"),
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Инструменты", exact: true }).click();
+  await page.getByText("Открыть по ID", { exact: true }).click();
+  await expect(page.getByLabel("Идентификатор результата")).toBeVisible();
+  await page.getByLabel("Тип результата").selectOption("job");
+  await expect(page.getByLabel("Идентификатор результата")).toHaveAttribute(
+    "placeholder",
+    "Введите job_id",
+  );
+  await page.keyboard.press("Escape");
+  await expect(page.getByLabel("Идентификатор результата")).toHaveCount(0);
+  await page.getByRole("button", { name: "Инструменты", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Консоль запросов", exact: true })
+    .click();
+  await expect(
+    page.getByRole("region", { name: "Консоль API", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Закрыть консоль", exact: true })
+    .click();
+  await expect(
+    page.getByRole("region", { name: "Консоль API", exact: true }),
+  ).toHaveCount(0);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(
+    page.getByRole("button", { name: "Параметры территории", exact: true }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await page
+    .getByRole("button", { name: "Показать весь граф", exact: true })
+    .click();
+  await page.screenshot({
+    path: testInfo.outputPath("glass-mobile.png"),
+    fullPage: true,
+  });
+  await page.route(`**/api/graphs/${graph.id}`, (route) =>
+    route.fulfill({ json: graph }),
+  );
+  await page.getByRole("button", { name: "Инструменты", exact: true }).click();
+  await page.getByText("Открыть по ID", { exact: true }).click();
+  await page.getByLabel("Тип результата").selectOption("graph");
+  await page.getByLabel("Идентификатор результата").fill(graph.id);
+  await page
+    .locator(".open-form")
+    .getByRole("button", { name: "Открыть по ID", exact: true })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`graph=${graph.id}`));
+  await expect(page.getByLabel("Идентификатор результата")).toHaveCount(0);
 });

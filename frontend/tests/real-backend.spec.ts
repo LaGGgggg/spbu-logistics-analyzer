@@ -16,7 +16,9 @@ test("real Go backend: submit, poll and render a persisted graph", async ({
   const regions = (await response.json()) as { id: string }[];
   expect(regions.some((r) => r.id === "ui-fixture")).toBeTruthy();
   await page.goto("/");
-  await expect(page.getByText("Backend подключён")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Сервис доступен", exact: true }),
+  ).toBeVisible();
   await expect(page.locator(".leaflet-pane canvas")).toBeVisible();
   await page.screenshot({
     path: testInfo.outputPath("desktop.png"),

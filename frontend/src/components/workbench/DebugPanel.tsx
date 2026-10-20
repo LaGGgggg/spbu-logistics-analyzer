@@ -7,6 +7,7 @@ import {
   Copy,
   Terminal,
   Trash2,
+  X,
 } from "lucide-react";
 import { clearTraces, getTraces, subscribeTraces } from "../../api/graphs";
 
@@ -36,7 +37,13 @@ function Json({ value }: { value: unknown }) {
     </pre>
   );
 }
-export default function DebugPanel({ example }: { example: boolean }) {
+export default function DebugPanel({
+  example,
+  onClose,
+}: {
+  example: boolean;
+  onClose: () => void;
+}) {
   const traces = useSyncExternalStore(subscribeTraces, getTraces);
   const [open, setOpen] = useState(true);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -84,6 +91,13 @@ export default function DebugPanel({ example }: { example: boolean }) {
             }}
           >
             <Trash2 size={14} />
+          </button>
+          <button
+            aria-label="Закрыть консоль"
+            title="Закрыть консоль"
+            onClick={onClose}
+          >
+            <X size={16} />
           </button>
         </div>
       </div>

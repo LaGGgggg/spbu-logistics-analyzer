@@ -238,9 +238,6 @@ export default function GraphMap({
         )}
       </MapContainer>
       <div className="map-top-controls">
-        <span className="map-caption">
-          <span className="live-dot" /> Транспортная сеть
-        </span>
         <button
           className={`map-button ${drawing ? "active" : ""}`}
           onClick={() => onDrawing(!drawing)}
