@@ -37,7 +37,11 @@ func selectAreaNodes(ctx context.Context, path string, bounds logistics.Bounds, 
 	}
 
 	nodes := map[osm.NodeID]bool{}
-	err := scan(ctx, path, nodeObjects, func(object osm.Object) error {
+	err := scan(ctx, path, nodeObjects, func(object osm.Object) bool {
+		node, ok := object.(*osm.Node)
+
+		return ok && inside(bounds, logistics.Coordinates{Longitude: node.Lon, Latitude: node.Lat})
+	}, func(object osm.Object) error {
 		node, ok := object.(*osm.Node)
 
 		if !ok || !inside(bounds, logistics.Coordinates{Longitude: node.Lon, Latitude: node.Lat}) {

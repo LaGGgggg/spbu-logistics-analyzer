@@ -23,7 +23,7 @@ const (
 	relationObjects
 )
 
-func scan(ctx context.Context, path string, kinds objectKinds, visit func(osm.Object) error) error {
+func scan(ctx context.Context, path string, kinds objectKinds, keep func(osm.Object) bool, visit func(osm.Object) error) error {
 
 	f, err := os.Open(path)
 
@@ -40,6 +40,15 @@ func scan(ctx context.Context, path string, kinds objectKinds, visit func(osm.Ob
 		pbf.SkipNodes = kinds&nodeObjects == 0
 		pbf.SkipWays = kinds&wayObjects == 0
 		pbf.SkipRelations = kinds&relationObjects == 0
+
+		// PBF filters run on decoder goroutines. Their captured state must be
+		// immutable during this pass; rejected objects reuse decoder memory.
+		if keep != nil {
+			pbf.FilterNode = func(node *osm.Node) bool { return keep(node) }
+			pbf.FilterWay = func(way *osm.Way) bool { return keep(way) }
+			pbf.FilterRelation = func(relation *osm.Relation) bool { return keep(relation) }
+		}
+
 		scanner = pbf
 	} else {
 		scanner = osmxml.New(ctx, f)
@@ -67,6 +76,10 @@ func scan(ctx context.Context, path string, kinds objectKinds, visit func(osm.Ob
 			if kinds&relationObjects == 0 {
 				continue
 			}
+		}
+
+		if keep != nil && !keep(object) {
+			continue
 		}
 
 		if err := visit(object); err != nil {
@@ -151,7 +164,11 @@ func readOSM(ctx context.Context, path string, limit int, bounds logistics.Bound
 
 		return nil
 	}
-	err = scan(ctx, path, wayObjects, func(obj osm.Object) error {
+	err = scan(ctx, path, wayObjects, func(obj osm.Object) bool {
+		way, ok := obj.(*osm.Way)
+
+		return ok && touchesArea(way, localNodes)
+	}, func(obj osm.Object) error {
 		if o, ok := obj.(*osm.Way); ok {
 			if touchesArea(o, localNodes) {
 				if err := check(); err != nil {
@@ -170,7 +187,7 @@ func readOSM(ctx context.Context, path string, limit int, bounds logistics.Bound
 	}
 
 	// Select relations after ways so selection also works for unordered XML.
-	err = scan(ctx, path, relationObjects, func(obj osm.Object) error {
+	err = scan(ctx, path, relationObjects, nil, func(obj osm.Object) error {
 		o, ok := obj.(*osm.Relation)
 
 		if !ok || !candidate(tagsMap(o.Tags)) || (o.Tags.Find("type") != "multipolygon" && o.Tags.Find("type") != "site") {
@@ -218,8 +235,20 @@ func readOSM(ctx context.Context, path string, limit int, bounds logistics.Bound
 		}
 	}
 
-	if len(wantedWays) > 0 {
-		if err := scan(ctx, path, wayObjects, func(obj osm.Object) error {
+	missingWays := map[osm.WayID]bool{}
+
+	for id := range wantedWays {
+		if ways[id] == nil {
+			missingWays[id] = true
+		}
+	}
+
+	if len(missingWays) > 0 {
+		if err := scan(ctx, path, wayObjects, func(obj osm.Object) bool {
+			way, ok := obj.(*osm.Way)
+
+			return ok && missingWays[way.ID]
+		}, func(obj osm.Object) error {
 			if way, ok := obj.(*osm.Way); ok && wantedWays[way.ID] && ways[way.ID] == nil {
 				if err := check(); err != nil {
 					return err
@@ -247,7 +276,11 @@ func readOSM(ctx context.Context, path string, limit int, bounds logistics.Bound
 	// Release the spatial index before loading complete way geometries.
 	localNodes = nil
 
-	err = scan(ctx, path, nodeObjects, func(obj osm.Object) error {
+	err = scan(ctx, path, nodeObjects, func(obj osm.Object) bool {
+		node, ok := obj.(*osm.Node)
+
+		return ok && (wantedNodes[node.ID] || inside(selectionBounds, logistics.Coordinates{Longitude: node.Lon, Latitude: node.Lat}))
+	}, func(obj osm.Object) error {
 		node, ok := obj.(*osm.Node)
 
 		if !ok {

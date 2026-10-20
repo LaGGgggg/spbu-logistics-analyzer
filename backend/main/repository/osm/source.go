@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/domain/logistics"
 )
@@ -149,11 +151,14 @@ func (s Source) Load(ctx context.Context, region logistics.Region) (logistics.Da
 		return logistics.Dataset{}, err
 	}
 
+	started := time.Now()
 	dataset, err := readOSM(ctx, files.OSM, s.Catalog.MaximumObjects, region.Bounds, s.Catalog.Policy.MaximumSnapKM)
 
 	if err != nil {
 		return dataset, fmt.Errorf("OSM: %w", err)
 	}
+
+	slog.Info("OSM dataset loaded", "region_id", region.ID, "duration", time.Since(started), "features", len(dataset.Features), "tracks", len(dataset.Tracks))
 
 	dataset.Sources = []string{filepath.Base(files.OSM), "OpenStreetMap contributors (ODbL)"}
 
