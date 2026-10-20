@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -72,14 +73,25 @@ func run() error {
 	defer release()
 
 	source := osmdata.Source{Catalog: catalog}
-	manager := &logistics_service.WorkerService{Repository: repository, Builder: graph_build_service.Service{Source: source, Policy: catalog.Policy}, Workers: cfg.Workers, PollInterval: time.Second, BuildTimeout: cfg.BuildTimeout}
+	service := logistics_service.NewService(repository, source)
+	manager := &logistics_service.WorkerService{Repository: repository, Updates: service, Builder: graph_build_service.Service{Source: source, Policy: catalog.Policy}, Workers: cfg.Workers, PollInterval: time.Second, BuildTimeout: cfg.BuildTimeout}
 	workerDone := make(chan error, 1)
 
 	go func() {
 		workerDone <- manager.Run(ctx)
 	}()
 
-	server := &http.Server{Addr: cfg.HTTPAddr, Handler: httpapi.NewRouter(logistics_service.NewService(repository, source)), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: time.Minute}
+	server := &http.Server{
+		Addr:              cfg.HTTPAddr,
+		Handler:           httpapi.NewRouter(service),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      35 * time.Second,
+		IdleTimeout:       time.Minute,
+		BaseContext: func(net.Listener) context.Context {
+			return ctx
+		},
+	}
 	serverDone := make(chan error, 1)
 
 	go func() {

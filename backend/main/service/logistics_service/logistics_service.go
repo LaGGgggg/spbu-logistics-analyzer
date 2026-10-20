@@ -3,6 +3,7 @@ package logistics_service
 import (
 	"context"
 	"strings"
+	"sync"
 
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/domain/logistics"
 )
@@ -10,6 +11,8 @@ import (
 type Service struct {
 	repository Repository
 	areas      AreaResolver
+	updatesMu  sync.Mutex
+	updates    map[string]map[chan struct{}]struct{}
 }
 
 func NewService(repository Repository, resolvers ...AreaResolver) *Service {

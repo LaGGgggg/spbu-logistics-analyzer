@@ -105,17 +105,7 @@ func NewRouter(service logistics_service.Queries) *gin.Engine {
 			c.JSON(http.StatusAccepted, result)
 		}
 	})
-	router.GET("/api/jobs/:id", func(c *gin.Context) {
-		job, err := service.GetJob(c.Request.Context(), c.Param("id"))
-
-		if err != nil {
-			respondError(c, err)
-
-			return
-		}
-
-		c.JSON(http.StatusOK, job)
-	})
+	router.GET("/api/jobs/:id", jobStatus(service))
 	router.GET("/api/graphs/:id", func(c *gin.Context) {
 		graph, err := service.GetGraph(c.Request.Context(), c.Param("id"))
 

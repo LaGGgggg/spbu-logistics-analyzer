@@ -61,6 +61,15 @@ func (r *outcomeRepository) Requeue(ctx context.Context, _ string) error {
 	return r.persist(ctx, "requeue")
 }
 
+type recordedUpdates struct {
+	repo   *outcomeRepository
+	states []string
+}
+
+func (n *recordedUpdates) NotifyJobChanged(id string) {
+	n.states = append(n.states, id+":"+n.repo.outcome)
+}
+
 func TestWorkerPersistsOutcome(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
@@ -98,7 +107,8 @@ func TestWorkerPersistsOutcome(t *testing.T) {
 
 				return tc.builder(buildCtx, region)
 			})
-			manager := logistics_service.WorkerService{Repository: repo, Builder: builder, Workers: 1, PollInterval: time.Millisecond, BuildTimeout: time.Second}
+			updates := &recordedUpdates{repo: repo}
+			manager := logistics_service.WorkerService{Repository: repo, Updates: updates, Builder: builder, Workers: 1, PollInterval: time.Millisecond, BuildTimeout: time.Second}
 			err := manager.Run(ctx)
 
 			if repo.outcome != tc.want {
@@ -107,6 +117,17 @@ func TestWorkerPersistsOutcome(t *testing.T) {
 
 			if !errors.Is(err, tc.saveErr) {
 				t.Fatalf("error=%v want=%v", err, tc.saveErr)
+			}
+
+			expectedNotifications := 2
+			if tc.saveErr != nil {
+				expectedNotifications = 1
+			}
+			if len(updates.states) != expectedNotifications || updates.states[0] != "job:" {
+				t.Fatalf("invalid notifications: %v", updates.states)
+			}
+			if tc.saveErr == nil && updates.states[1] != "job:"+tc.want {
+				t.Fatalf("notification published before persistence: %v", updates.states)
 			}
 
 			if repo.saveContextErr != nil {

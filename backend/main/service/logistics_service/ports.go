@@ -2,6 +2,7 @@ package logistics_service
 
 import (
 	"context"
+	"time"
 
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/domain/logistics"
 )
@@ -11,6 +12,7 @@ type Queries interface {
 	RequestBuild(context.Context, string) (BuildResult, error)
 	RequestAreaBuild(context.Context, logistics.Bounds) (BuildResult, error)
 	GetJob(context.Context, string) (Job, error)
+	WaitJob(context.Context, string, time.Time, time.Duration) (Job, error)
 	GetGraph(context.Context, string) (logistics.LogisticsGraph, error)
 }
 

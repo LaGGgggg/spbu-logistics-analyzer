@@ -5,7 +5,6 @@ import {
   getJob,
   getRegions,
   requestBuild,
-  waitForPoll,
 } from "../api/graphs";
 import { exampleGraph } from "../data/example";
 import type {
@@ -56,8 +55,9 @@ export function useLogistics() {
       url.searchParams.delete("graph");
       url.searchParams.set("job", id);
       history.replaceState(null, "", url);
+      let after: string | undefined;
       while (!signal.aborted) {
-        const state = await getJob(id, signal);
+        const state = await getJob(id, signal, after);
         if (signal.aborted) return;
         setJob(state);
         if (state.status === "failed")
@@ -72,7 +72,9 @@ export function useLogistics() {
           setPendingJobId("");
           return;
         }
-        await waitForPoll(signal);
+        if (!state.updated_at || Number.isNaN(Date.parse(state.updated_at)))
+          throw new Error("В ответе задания отсутствует корректный updated_at.");
+        after = state.updated_at;
       }
     },
     [loadGraph],

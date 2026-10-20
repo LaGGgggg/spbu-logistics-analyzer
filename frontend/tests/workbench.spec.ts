@@ -58,7 +58,7 @@ test("example is clearly labelled, supports node inspection and never starts a b
   expect(posts).toBe(0);
 });
 
-test("build, poll, filter via API, read coverage and export", async ({
+test("build, long poll, filter via API, read coverage and export", async ({
   page,
 }) => {
   await base(page);
@@ -67,16 +67,23 @@ test("build, poll, filter via API, read coverage and export", async ({
     expect(route.request().postDataJSON()).toEqual({ region_id: region.id });
     await route.fulfill({ status: 202, json: { job_id: "job-1" } });
   });
-  await page.route("**/api/jobs/job-1", (route) =>
-    route.fulfill({
+  await page.route("**/api/jobs/job-1*", async (route) => {
+    if (polls > 0) {
+      const url = new URL(route.request().url());
+      expect(url.searchParams.get("wait")).toBe("25");
+      expect(url.searchParams.get("after")).toBe("2026-10-21T00:00:00Z");
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+    return route.fulfill({
       json: {
         id: "job-1",
         region_id: region.id,
         status: ++polls === 1 ? "processing" : "completed",
         graph_id: polls > 1 ? graph.id : undefined,
+        updated_at: "2026-10-21T00:00:00Z",
       },
-    }),
-  );
+    });
+  });
   await page.route(`**/api/graphs/${graph.id}`, (route) =>
     route.fulfill({ json: graph }),
   );
@@ -188,22 +195,25 @@ test("validates bounds and surfaces backend errors without replacing the example
   ).toBeVisible();
 });
 
-test("stopping polling leaves the server job resumable", async ({ page }) => {
+test("stopping long polling leaves the server job resumable", async ({ page }) => {
   await base(page);
   let completed = false;
   await page.route("**/api/graphs", (route) =>
     route.fulfill({ status: 202, json: { job_id: "long-job" } }),
   );
-  await page.route("**/api/jobs/long-job", (route) =>
-    route.fulfill({
+  await page.route("**/api/jobs/long-job*", async (route) => {
+    if (!completed && new URL(route.request().url()).searchParams.has("wait"))
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    return route.fulfill({
       json: {
         id: "long-job",
         region_id: region.id,
         status: completed ? "completed" : "processing",
         graph_id: completed ? graph.id : undefined,
+        updated_at: "2026-10-21T00:00:00Z",
       },
-    }),
-  );
+    });
+  });
   await page.route(`**/api/graphs/${graph.id}`, (route) =>
     route.fulfill({ json: graph }),
   );

@@ -172,11 +172,37 @@ paths:
         При completed graph_id обязательно присутствует. error — публичное сообщение,
         детали сбоя остаются в серверных логах. Истечение клиентского HTTP-таймаута
         не означает, что серверная задача завершилась ошибкой.
+        Без wait запрос возвращает статус сразу. Для long polling передайте wait=25
+        и after, равный updated_at последнего ответа. При изменении updated_at или
+        конечном статусе ответ возвращается сразу; при истечении wait возвращается
+        актуальный снимок с HTTP 200, в том числе с прежним updated_at.
+        После такого ответа клиент повторяет ожидание с новым updated_at.
+        Отключение клиента прекращает только ожидание, построение продолжается.
       parameters:
         - $ref: '#/components/parameters/ResourceId'
+        - name: wait
+          in: query
+          description: Максимальное ожидание изменения в секундах; при wait > 0 обязателен after
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 25
+            default: 0
+        - name: after
+          in: query
+          description: updated_at последнего полученного состояния; URL-кодируйте значение, включая знак + часового пояса
+          schema:
+            type: string
+            format: date-time
+          example: '2026-10-21T00:00:00Z'
       responses:
         '200':
-          description: Текущее состояние задачи
+          description: Текущее состояние задачи после изменения или окончания ожидания
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              example: no-store
           content:
             application/json:
               schema:

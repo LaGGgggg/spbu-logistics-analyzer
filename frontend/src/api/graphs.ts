@@ -165,8 +165,12 @@ export const getRegions = (signal?: AbortSignal) =>
   request<Region[]>("/api/regions", { signal });
 export const requestBuild = (body: BuildRequest, signal?: AbortSignal) =>
   request<BuildResult>("/api/graphs", { body, signal });
-export const getJob = (id: string, signal?: AbortSignal) =>
-  request<Job>(`/api/jobs/${idPath(id)}`, { signal });
+export const getJob = (id: string, signal?: AbortSignal, after?: string) => {
+  const query = after
+    ? `?${new URLSearchParams({ wait: "25", after }).toString()}`
+    : "";
+  return request<Job>(`/api/jobs/${idPath(id)}${query}`, { signal });
+};
 export const getGraph = (
   id: string,
   signal?: AbortSignal,
@@ -187,23 +191,6 @@ export const getExport = (
     signal,
     download: true,
   });
-export function waitForPoll(signal: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (signal.aborted) {
-      reject(new DOMException("Отменено", "AbortError"));
-      return;
-    }
-    const abort = () => {
-      clearTimeout(timer);
-      reject(new DOMException("Отменено", "AbortError"));
-    };
-    const timer = window.setTimeout(() => {
-      signal.removeEventListener("abort", abort);
-      resolve();
-    }, 1200);
-    signal.addEventListener("abort", abort, { once: true });
-  });
-}
 export function saveFile(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");

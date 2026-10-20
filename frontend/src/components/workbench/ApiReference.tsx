@@ -48,7 +48,7 @@ const endpoints = [
   {
     method: "GET",
     path: "/api/jobs/{id}",
-    description: "Статус фонового задания и graph_id",
+    description: "Статус и graph_id. Long polling: ?wait=25&after=updated_at",
     response: "200 / 404",
     action: "job",
   },

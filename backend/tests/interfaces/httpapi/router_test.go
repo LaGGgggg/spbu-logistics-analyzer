@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/domain/logistics"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/interfaces/httpapi"
@@ -43,6 +44,15 @@ func (q *queries) GetJob(context.Context, string) (logistics_service.Job, error)
 	return logistics_service.Job{}, logistics_service.ErrNotFound
 }
 
+func (q *queries) WaitJob(_ context.Context, id string, after time.Time, wait time.Duration) (logistics_service.Job, error) {
+
+	if id == "missing" {
+		return logistics_service.Job{}, logistics_service.ErrNotFound
+	}
+
+	return logistics_service.Job{ID: id, UpdatedAt: after, Status: logistics_service.Processing}, nil
+}
+
 func (q *queries) GetGraph(_ context.Context, id string) (logistics.LogisticsGraph, error) {
 
 	if id == "missing" {
@@ -71,7 +81,14 @@ func TestAPIValidationAndExports(t *testing.T) {
 		{"POST", "/api/graphs", `{"region_id":"r","url":"http://example.com"}`, 400},
 		{"POST", "/api/graphs", `{"region_id":"r"} {}`, 400}, {"POST", "/api/graphs", `{"region_id":" r"}`, 400},
 		{"POST", "/api/graphs", `null`, 400}, {"POST", "/api/graphs", strings.Repeat(" ", 5000), 400},
-		{"GET", "/api/jobs/missing", "", 404}, {"GET", "/api/graphs/missing", "", 404},
+		{"GET", "/api/jobs/missing", "", 404},
+		{"GET", "/api/jobs/job?wait=25&after=2026-10-21T00:00:00Z", "", 200},
+		{"GET", "/api/jobs/missing?wait=25&after=2026-10-21T00:00:00Z", "", 404},
+		{"GET", "/api/jobs/job?wait=26&after=2026-10-21T00:00:00Z", "", 400},
+		{"GET", "/api/jobs/job?wait=-1", "", 400},
+		{"GET", "/api/jobs/job?wait=0.5", "", 400},
+		{"GET", "/api/jobs/job?wait=25", "", 400},
+		{"GET", "/api/jobs/job?wait=25&after=bad", "", 400}, {"GET", "/api/graphs/missing", "", 404},
 		{"GET", "/api/graphs/g?mode=invalid", "", 400}, {"GET", "/api/graphs/g/export/geojson", "", 200},
 		{"GET", "/api/graphs/g/export/bad", "", 400}, {"GET", "/api/graphs/g/coverage", "", 200},
 	}
