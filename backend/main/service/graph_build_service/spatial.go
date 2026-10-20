@@ -1,6 +1,7 @@
 package graph_build_service
 
 import (
+	"context"
 	"math"
 	"slices"
 
@@ -25,9 +26,9 @@ func xyz(c logistics.Coordinates) [3]float64 {
 	return [3]float64{math.Cos(lat) * math.Cos(lon), math.Cos(lat) * math.Sin(lon), math.Sin(lat)}
 }
 
-func newSpatialIndex(points []spatialPoint, depth int) *spatialIndex {
+func newSpatialIndex(ctx context.Context, points []spatialPoint, depth int) *spatialIndex {
 
-	if len(points) == 0 {
+	if len(points) == 0 || ctx.Err() != nil {
 		return nil
 	}
 
@@ -53,7 +54,7 @@ func newSpatialIndex(points []spatialPoint, depth int) *spatialIndex {
 	})
 	mid := len(points) / 2
 
-	return &spatialIndex{point: points[mid], axis: axis, left: newSpatialIndex(points[:mid], depth+1), right: newSpatialIndex(points[mid+1:], depth+1)}
+	return &spatialIndex{point: points[mid], axis: axis, left: newSpatialIndex(ctx, points[:mid], depth+1), right: newSpatialIndex(ctx, points[mid+1:], depth+1)}
 }
 
 func (index *spatialIndex) nearest(c logistics.Coordinates, maxKM float64) string {

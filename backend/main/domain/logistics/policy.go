@@ -8,17 +8,18 @@ import (
 )
 
 type FreightPolicy struct {
-	MinimumWarehouseAreaM2 float64 `json:"minimum_warehouse_area_m2"`
-	MaximumSnapKM          float64 `json:"maximum_snap_km"`
+	RouteGeometryToleranceM float64 `json:"route_geometry_tolerance_m"`
+	MinimumWarehouseAreaM2  float64 `json:"minimum_warehouse_area_m2"`
+	MaximumSnapKM           float64 `json:"maximum_snap_km"`
 }
 
 func DefaultFreightPolicy() FreightPolicy {
-	return FreightPolicy{MinimumWarehouseAreaM2: 10000, MaximumSnapKM: 1}
+	return FreightPolicy{MinimumWarehouseAreaM2: 10000, MaximumSnapKM: 1, RouteGeometryToleranceM: 10}
 }
 
 func (p FreightPolicy) Validate() error {
 
-	if !inRange(p.MinimumWarehouseAreaM2, 0, 1e12) || !inRange(p.MaximumSnapKM, 0.001, 10) {
+	if !inRange(p.RouteGeometryToleranceM, 0, 1000) || !inRange(p.MinimumWarehouseAreaM2, 0, 1e12) || !inRange(p.MaximumSnapKM, 0.001, 10) {
 		return fmt.Errorf("invalid freight policy")
 	}
 

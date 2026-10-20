@@ -126,7 +126,7 @@ func (p Service) Build(ctx context.Context, region logistics.Region) (logistics.
 		return g, fmt.Errorf("no confirmed freight facilities in region %s", region.ID)
 	}
 
-	if err := connect(ctx, &g, dataset.Tracks, p.Policy.MaximumSnapKM); err != nil {
+	if err := connect(ctx, &g, dataset.Tracks, p.Policy.MaximumSnapKM, p.Policy.RouteGeometryToleranceM); err != nil {
 		return g, err
 	}
 
