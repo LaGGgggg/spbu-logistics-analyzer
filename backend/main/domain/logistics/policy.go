@@ -8,17 +8,16 @@ import (
 )
 
 type FreightPolicy struct {
-	MinimumWarehouseAreaM2 float64 `json:"minimum_warehouse_area_m2"`
-	MaximumSnapKM          float64 `json:"maximum_snap_km"`
+	MaximumSnapKM float64 `json:"maximum_snap_km"`
 }
 
 func DefaultFreightPolicy() FreightPolicy {
-	return FreightPolicy{MinimumWarehouseAreaM2: 10000, MaximumSnapKM: 1}
+	return FreightPolicy{MaximumSnapKM: 1}
 }
 
 func (p FreightPolicy) Validate() error {
 
-	if !inRange(p.MinimumWarehouseAreaM2, 0, 1e12) || !inRange(p.MaximumSnapKM, 0.001, 10) {
+	if !inRange(p.MaximumSnapKM, 0.001, 10) {
 		return fmt.Errorf("invalid freight policy")
 	}
 
@@ -110,7 +109,7 @@ func (p FreightPolicy) Classify(f Feature, references []Reference) (LogisticsNod
 	cargo := t["freight"] == "yes" || (t["cargo"] != "" && t["cargo"] != "no" && t["cargo"] != "passengers")
 
 	if t["railway"] == "container_terminal" || t["industrial"] == "intermodal_freight_terminal" || (t["railway"] == "station" && cargo) || (t["railway"] == "yard" && (cargo || t["railway:yard:purpose"] == "intermodal" || t["railway:yard:purpose"] == "transloading")) {
-		node.Modes = append(node.Modes, TransportRail, TransportRoad)
+		node.Modes = append(node.Modes, TransportRail)
 		node.Kind = "freight_terminal"
 	}
 
@@ -127,23 +126,13 @@ func (p FreightPolicy) Classify(f Feature, references []Reference) (LogisticsNod
 			mode = TransportRail
 		}
 
-		node.Modes = append(node.Modes, mode, TransportRoad)
+		node.Modes = append(node.Modes, mode)
 		node.Kind = "port"
 	}
 
 	if t["aeroway"] == "cargo" || t["aeroway"] == "cargo_terminal" || (cargo && (t["aeroway"] == "aerodrome" || t["aeroway"] == "terminal")) {
-		node.Modes = append(node.Modes, TransportAir, TransportRoad)
+		node.Modes = append(node.Modes, TransportAir)
 		node.Kind = "cargo_airport"
-	}
-
-	warehouse := t["building"] == "warehouse" || t["industrial"] == "warehouse" || t["industrial"] == "logistics" || t["man_made"] == "distribution_centre"
-
-	if warehouse && (cargo || t["man_made"] == "distribution_centre" || f.AreaM2 >= p.MinimumWarehouseAreaM2) {
-		node.Modes = append(node.Modes, TransportRoad)
-
-		if node.Kind == "" {
-			node.Kind = "warehouse"
-		}
 	}
 
 	if len(node.Modes) == 0 {

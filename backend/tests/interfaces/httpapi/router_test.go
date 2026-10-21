@@ -49,7 +49,7 @@ func (q *queries) GetGraph(_ context.Context, id string) (logistics.LogisticsGra
 		return logistics.LogisticsGraph{}, logistics_service.ErrNotFound
 	}
 
-	return logistics.LogisticsGraph{ID: id, Nodes: []logistics.LogisticsNode{{ID: "n", Modes: []logistics.TransportMode{logistics.TransportRoad}}, {ID: "port", Modes: []logistics.TransportMode{logistics.TransportSea}}}}, nil
+	return logistics.LogisticsGraph{ID: id, Nodes: []logistics.LogisticsNode{{ID: "n", Modes: []logistics.TransportMode{logistics.TransportRail}}, {ID: "port", Modes: []logistics.TransportMode{logistics.TransportSea}}}}, nil
 }
 
 func TestAPIValidationAndExports(t *testing.T) {
@@ -90,7 +90,7 @@ func TestAPIValidationAndExports(t *testing.T) {
 	}
 
 	w := httptest.NewRecorder()
-	r.ServeHTTP(w, httptest.NewRequest("GET", "/api/graphs/g?mode=road", nil))
+	r.ServeHTTP(w, httptest.NewRequest("GET", "/api/graphs/g?mode=rail", nil))
 
 	if strings.Contains(w.Body.String(), `"id":"port"`) {
 		t.Fatal("mode filter leaked sea node")

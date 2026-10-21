@@ -70,7 +70,7 @@ func distance(a, b logistics.Coordinates) float64 {
 
 func connect(ctx context.Context, g *logistics.LogisticsGraph, tracks []logistics.Track, maxSnap float64) error {
 
-	for _, mode := range []logistics.TransportMode{logistics.TransportRoad, logistics.TransportRail, logistics.TransportRiver, logistics.TransportSea, logistics.TransportAir} {
+	for _, mode := range []logistics.TransportMode{logistics.TransportRail, logistics.TransportRiver, logistics.TransportSea, logistics.TransportAir} {
 		n := network{points: map[string]logistics.Coordinates{}, arcs: map[string][]arc{}}
 
 		for _, track := range tracks {
