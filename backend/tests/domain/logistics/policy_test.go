@@ -26,8 +26,8 @@ func TestFreightPolicy(t *testing.T) {
 		{"dry port", map[string]string{"port": "cargo", "port:type": "dryport"}, 0, true, logistics.TransportRail},
 		{"scheduled airport insufficient", map[string]string{"aeroway": "aerodrome", "iata": "LED", "scheduled_service": "yes"}, 0, false, ""},
 		{"cargo terminal", map[string]string{"aeroway": "cargo_terminal"}, 0, true, logistics.TransportAir},
-		{"small warehouse", map[string]string{"building": "warehouse"}, 9999, false, ""},
-		{"large warehouse", map[string]string{"building": "warehouse"}, 10000, true, logistics.TransportRoad},
+		{"small warehouse rejected", map[string]string{"building": "warehouse"}, 9999, false, ""},
+		{"large warehouse rejected", map[string]string{"building": "warehouse"}, 10000, false, ""},
 		{"office", map[string]string{"office": "logistics"}, 0, false, ""},
 	}
 
