@@ -4,13 +4,12 @@ import { AppLayout } from './components/layout/AppLayout'
 import { Header } from './header/Header'
 import { BuildPanel } from './build/BuildPanel'
 
-
-
 function App() {
+  const graphId: string | undefined = undefined;
 
   return (
     <AppLayout
-      header={<Header />}
+      header={<Header graphId={graphId} />}
       left={<BuildPanel />}
       right={<div className="p-4">Статистика / Метрики / Узел</div>}
     >
