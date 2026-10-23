@@ -13,9 +13,9 @@ export function Export({ graphId }: ExportProps) {
     const [isDownloading, setIsDownloading] = useState(false);
 
     useEffect(() => {
-    if (!isOpen) return;
+        if (!isOpen) return;
 
-    function handleKeyDown(event: KeyboardEvent) {
+        function handleKeyDown(event: KeyboardEvent) {
             if (event.key === "Escape") {
                 setIsOpen(false);
             }
@@ -40,7 +40,7 @@ export function Export({ graphId }: ExportProps) {
         } finally {
             setIsDownloading(false);
         }
-    }  
+    }
 
     return (
         <>
@@ -54,7 +54,7 @@ export function Export({ graphId }: ExportProps) {
 
             {isOpen && (
                 <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4">
-                    <div className="w-full max-w-3xl rounded-lg border bg-background p-6 text-foreground">
+                    <div className="w-full max-w-2xl rounded-sm border bg-background p-6 text-foreground">
                         <div className="mb-6 flex items-start justify-between gap-4">
                             <div>
                                 <h2 className="text-xl font-semibold">
@@ -80,11 +80,10 @@ export function Export({ graphId }: ExportProps) {
                             <button
                                 type="button"
                                 onClick={() => setFormat("nodes.csv")}
-                                className={`rounded-xl border-2 p-4 text-left ${
-                                    format === "nodes.csv"
-                                        ? "border-blue-700"
-                                        : "border-border"
-                                }`}
+                                className={`rounded-xl border-2 p-4 text-left ${format === "nodes.csv"
+                                    ? "border-blue-700"
+                                    : "border-border"
+                                    }`}
                             >
                                 <div className="flex items-center justify-between gap-3">
                                     <span className="font-semibold">CSV узлов</span>
@@ -97,11 +96,10 @@ export function Export({ graphId }: ExportProps) {
                             <button
                                 type="button"
                                 onClick={() => setFormat("edges.csv")}
-                                className={`rounded-xl border-2 p-4 text-left ${
-                                    format === "edges.csv"
-                                        ? "border-blue-700"
-                                        : "border-border"
-                                }`}
+                                className={`rounded-xl border-2 p-4 text-left ${format === "edges.csv"
+                                    ? "border-blue-700"
+                                    : "border-border"
+                                    }`}
                             >
                                 <div className="flex items-center justify-between gap-3">
                                     <span className="font-semibold">CSV рёбер</span>
@@ -114,11 +112,10 @@ export function Export({ graphId }: ExportProps) {
                             <button
                                 type="button"
                                 onClick={() => setFormat("adjacency.csv")}
-                                className={`rounded-xl border-2 p-4 text-left ${
-                                    format === "adjacency.csv"
-                                        ? "border-blue-700"
-                                        : "border-border"
-                                }`}
+                                className={`rounded-xl border-2 p-4 text-left ${format === "adjacency.csv"
+                                    ? "border-blue-700"
+                                    : "border-border"
+                                    }`}
                             >
                                 <div className="flex items-center justify-between gap-3">
                                     <span className="font-semibold">Матрица смежности</span>
@@ -129,11 +126,10 @@ export function Export({ graphId }: ExportProps) {
                             <button
                                 type="button"
                                 onClick={() => setFormat("incidence.csv")}
-                                className={`rounded-xl border-2 p-4 text-left ${
-                                    format === "incidence.csv"
-                                        ? "border-blue-700"
-                                        : "border-border"
-                                }`}
+                                className={`rounded-xl border-2 p-4 text-left ${format === "incidence.csv"
+                                    ? "border-blue-700"
+                                    : "border-border"
+                                    }`}
                             >
                                 <div className="flex items-center justify-between gap-3">
                                     <span className="font-semibold">Матрица инцидентности</span>
@@ -144,11 +140,10 @@ export function Export({ graphId }: ExportProps) {
                             <button
                                 type="button"
                                 onClick={() => setFormat("geojson")}
-                                className={`rounded-xl border-2 p-4 text-left ${
-                                    format === "geojson"
-                                        ? "border-blue-700"
-                                        : "border-border"
-                                }`}
+                                className={`rounded-xl border-2 p-4 text-left ${format === "geojson"
+                                    ? "border-blue-700"
+                                    : "border-border"
+                                    }`}
                             >
                                 <div className="flex items-center justify-between gap-3">
                                     <span className="font-semibold">GeoJSON</span>
@@ -159,11 +154,10 @@ export function Export({ graphId }: ExportProps) {
                             <button
                                 type="button"
                                 onClick={() => setFormat("graphml")}
-                                className={`rounded-xl border-2 p-4 text-left ${
-                                    format === "graphml"
-                                        ? "border-blue-700"
-                                        : "border-border"
-                                }`}
+                                className={`rounded-xl border-2 p-4 text-left ${format === "graphml"
+                                    ? "border-blue-700"
+                                    : "border-border"
+                                    }`}
                             >
                                 <div className="flex items-center justify-between gap-3">
                                     <span className="font-semibold">GraphML</span>
@@ -180,6 +174,7 @@ export function Export({ graphId }: ExportProps) {
 
                         <div className="mt-6 flex justify-end gap-3 border-t pt-4">
                             <Button
+                                className={"h-10"}
                                 variant="outline"
                                 onClick={() => setIsOpen(false)}
                             >
@@ -187,6 +182,7 @@ export function Export({ graphId }: ExportProps) {
                             </Button>
 
                             <Button
+                                className={"h-10"}
                                 disabled={!graphId || isDownloading}
                                 onClick={handleDownload}
                             >
