@@ -1,16 +1,18 @@
 import type { BBox } from "@/components/map/BBoxDrawer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MousePointerSquareDashed, Network, X } from "lucide-react"
+import { Loader2, MousePointerSquareDashed, Network, X } from "lucide-react"
 
 type BuildPanelProps = {
     bbox: BBox | null
     drawMode: boolean
+    building: boolean
+    error: string | null
     onToggleDraw: () => void
     onClearBBox: () => void
+    onBuild: () => void
 }
-
-export function BuildPanel({ bbox, drawMode, onToggleDraw, onClearBBox }: BuildPanelProps) {
+export function BuildPanel({ bbox, drawMode, building, error, onToggleDraw, onClearBBox, onBuild }: BuildPanelProps) {
 
     return (
         <div>
@@ -50,10 +52,20 @@ export function BuildPanel({ bbox, drawMode, onToggleDraw, onClearBBox }: BuildP
                     )}
 
                 </div>
-                <Button className="h-12">
-                    <Network data-icon="inline-start" />
-                    Построить граф
+                <Button className="h-12" disabled={!bbox || building} onClick={onBuild}>
+                    {building
+                        ? <Loader2 data-icon="inline-start" className="animate-spin" />
+                        : <Network data-icon="inline-start" />}
+                    {building ? 'Строим граф...' : 'Построить граф'}
                 </Button>
+
+                {!bbox && (
+                    <p className="text-xs text-muted-foreground">Сначала выделите область на карте</p>
+                )}
+
+                {error && (
+                    <p className="text-sm text-destructive" role="alert">{error}</p>
+                )}
             </div>
         </div>
     )
