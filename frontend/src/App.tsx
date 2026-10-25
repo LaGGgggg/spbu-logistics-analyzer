@@ -11,6 +11,7 @@ import axios from 'axios';
 import { getApiErrorMessage } from './api/errors';
 import type { LogisticsGraph, TransportMode } from './api/types';
 import { UNKNOWN_KIND } from './lib/kinds'
+import { RightPanel } from "@/components/right-panel/RightPanel";
 
 
 function App() {
@@ -119,7 +120,7 @@ function App() {
           )}
         </>
       }
-      right={<div className="p-4">Статистика / Метрики / Узел</div>}
+      right={<RightPanel />}
     >
       <MapView
         bbox={bbox}
