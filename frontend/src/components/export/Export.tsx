@@ -7,6 +7,15 @@ type ExportProps = {
     graphId?: string;
 };
 
+const exportFormats = [
+    { value: "nodes.csv", label: "CSV узлов", extension: ".csv" },
+    { value: "edges.csv", label: "CSV рёбер", extension: ".csv" },
+    { value: "adjacency.csv", label: "Матрица смежности", extension: ".csv" },
+    { value: "incidence.csv", label: "Матрица инцидентности", extension: ".csv" },
+    { value: "geojson", label: "GeoJSON", extension: ".geojson" },
+    { value: "graphml", label: "GraphML", extension: ".graphml" },
+];
+
 export function Export({ graphId }: ExportProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [format, setFormat] = useState("nodes.csv");
@@ -77,93 +86,27 @@ export function Export({ graphId }: ExportProps) {
                         </div>
 
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                            <button
-                                type="button"
-                                onClick={() => setFormat("nodes.csv")}
-                                className={`rounded-xl border-2 p-4 text-left ${format === "nodes.csv"
-                                    ? "border-blue-700"
-                                    : "border-border"
+                            {exportFormats.map((item) => (
+                                <button
+                                    key={item.value}
+                                    type="button"
+                                    onClick={() => setFormat(item.value)}
+                                    className={`rounded-xl border-2 p-4 text-left ${
+                                        format === item.value
+                                            ? "border-blue-700"
+                                            : "border-border"
                                     }`}
-                            >
-                                <div className="flex items-center justify-between gap-3">
-                                    <span className="font-semibold">CSV узлов</span>
-                                    <span className="text-sm text-muted-foreground">
-                                        .csv
-                                    </span>
-                                </div>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setFormat("edges.csv")}
-                                className={`rounded-xl border-2 p-4 text-left ${format === "edges.csv"
-                                    ? "border-blue-700"
-                                    : "border-border"
-                                    }`}
-                            >
-                                <div className="flex items-center justify-between gap-3">
-                                    <span className="font-semibold">CSV рёбер</span>
-                                    <span className="text-sm text-muted-foreground">
-                                        .csv
-                                    </span>
-                                </div>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setFormat("adjacency.csv")}
-                                className={`rounded-xl border-2 p-4 text-left ${format === "adjacency.csv"
-                                    ? "border-blue-700"
-                                    : "border-border"
-                                    }`}
-                            >
-                                <div className="flex items-center justify-between gap-3">
-                                    <span className="font-semibold">Матрица смежности</span>
-                                    <span className="text-sm text-muted-foreground">.csv</span>
-                                </div>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setFormat("incidence.csv")}
-                                className={`rounded-xl border-2 p-4 text-left ${format === "incidence.csv"
-                                    ? "border-blue-700"
-                                    : "border-border"
-                                    }`}
-                            >
-                                <div className="flex items-center justify-between gap-3">
-                                    <span className="font-semibold">Матрица инцидентности</span>
-                                    <span className="text-sm text-muted-foreground">.csv</span>
-                                </div>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setFormat("geojson")}
-                                className={`rounded-xl border-2 p-4 text-left ${format === "geojson"
-                                    ? "border-blue-700"
-                                    : "border-border"
-                                    }`}
-                            >
-                                <div className="flex items-center justify-between gap-3">
-                                    <span className="font-semibold">GeoJSON</span>
-                                    <span className="text-sm text-muted-foreground">.geojson</span>
-                                </div>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setFormat("graphml")}
-                                className={`rounded-xl border-2 p-4 text-left ${format === "graphml"
-                                    ? "border-blue-700"
-                                    : "border-border"
-                                    }`}
-                            >
-                                <div className="flex items-center justify-between gap-3">
-                                    <span className="font-semibold">GraphML</span>
-                                    <span className="text-sm text-muted-foreground">.graphml</span>
-                                </div>
-                            </button>
+                                >
+                                    <div className="flex items-center justify-between gap-3">
+                                        <span className="font-semibold">
+                                            {item.label}
+                                        </span>
+                                        <span className="text-sm text-muted-foreground">
+                                            {item.extension}
+                                        </span>
+                                    </div>
+                                </button>
+                            ))}
                         </div>
 
                         {!graphId && (
