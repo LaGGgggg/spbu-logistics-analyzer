@@ -236,7 +236,7 @@ paths:
           allowEmptyValue: true
           schema:
             type: string
-            enum: [road, rail, sea, river, air, '']
+            enum: [rail, sea, river, '']
       responses:
         '200':
           description: Полный граф либо один транспортный слой
@@ -381,7 +381,7 @@ components:
         - maxLength: 128
     TransportMode:
       type: string
-      enum: [road, rail, sea, river, air]
+      enum: [rail, sea, river]
     Coordinates:
       type: object
       required: [longitude, latitude]

@@ -61,7 +61,7 @@ func (f fixtureSource) Load(context.Context, logistics.Region) (logistics.Datase
 func TestPhysicalIdentityAndDisconnectedNodes(t *testing.T) {
 
 	coord := logistics.Coordinates{Longitude: 30, Latitude: 60}
-	refs := []logistics.Reference{{PhysicalID: "port", ExternalIDs: []logistics.ExternalID{{Namespace: logistics.ExternalOSMNode, Value: "1"}, {Namespace: logistics.ExternalOSMWay, Value: "2"}}, Modes: []logistics.TransportMode{logistics.TransportRoad, logistics.TransportSea}, Cargo: true, Source: "test"}}
+	refs := []logistics.Reference{{PhysicalID: "port", ExternalIDs: []logistics.ExternalID{{Namespace: logistics.ExternalOSMNode, Value: "1"}, {Namespace: logistics.ExternalOSMWay, Value: "2"}}, Modes: []logistics.TransportMode{logistics.TransportRail, logistics.TransportSea}, Cargo: true, Source: "test"}}
 	features := []logistics.Feature{{ExternalID: logistics.ExternalID{Namespace: logistics.ExternalOSMNode, Value: "1"}, Coordinates: coord}, {ExternalID: logistics.ExternalID{Namespace: logistics.ExternalOSMWay, Value: "2"}, Coordinates: coord}}
 	p := graph_build_service.Service{Policy: logistics.DefaultFreightPolicy(), Source: fixtureSource{logistics.Dataset{Features: features, References: refs}}}
 	g, err := p.Build(context.Background(), logistics.Region{ID: "r", Name: "r", Bounds: logistics.Bounds{West: 29, East: 31, South: 59, North: 61}})

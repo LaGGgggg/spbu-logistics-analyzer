@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <osm version="0.6" generator="synthetic-test-fixture">
- <node id="1" lat="60" lon="30"><tag k="industrial" v="logistics"/><tag k="cargo" v="container"/><tag k="name" v="Terminal A"/></node>
+ <node id="1" lat="60" lon="30"><tag k="industrial" v="intermodal_freight_terminal"/><tag k="name" v="Terminal A"/></node>
  <node id="2" lat="60.01" lon="30"/>
  <node id="3" lat="60.01" lon="30.01"/>
- <node id="4" lat="60" lon="30.01"><tag k="industrial" v="logistics"/><tag k="cargo" v="container"/><tag k="name" v="Terminal B"/></node>
+ <node id="4" lat="60" lon="30.01"><tag k="industrial" v="intermodal_freight_terminal"/><tag k="name" v="Terminal B"/></node>
  <node id="5" lat="60.005" lon="30.02"><tag k="railway" v="station"/><tag k="name" v="Passenger station"/></node>
  <node id="6" lat="60.005" lon="30.03"><tag k="railway" v="station"/><tag k="esr:user" v="123456"/><tag k="name" v="Freight station"/></node>
- <way id="10"><nd ref="1"/><nd ref="2"/><nd ref="3"/><nd ref="4"/><tag k="highway" v="primary"/><tag k="oneway" v="yes"/></way>
- <way id="11"><nd ref="1"/><nd ref="4"/><tag k="highway" v="service"/><tag k="hgv" v="no"/></way>
+ <way id="10"><nd ref="1"/><nd ref="2"/><nd ref="3"/><nd ref="4"/><tag k="railway" v="rail"/><tag k="oneway" v="yes"/></way>
+ <way id="11"><nd ref="1"/><nd ref="4"/><tag k="railway" v="rail"/><tag k="railway:traffic_mode" v="passenger"/></way>
 </osm>

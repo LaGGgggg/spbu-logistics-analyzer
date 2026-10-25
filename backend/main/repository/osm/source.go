@@ -221,7 +221,7 @@ func (s Source) Load(ctx context.Context, region logistics.Region) (logistics.Da
 		dataset.Tracks = append(dataset.Tracks, tracks...)
 		dataset.Sources = append(dataset.Sources, filepath.Base(files.Routes))
 	} else {
-		dataset.Warnings = append(dataset.Warnings, "No sea/air route dataset; no inferred sea or air connections")
+		dataset.Warnings = append(dataset.Warnings, "No sea route dataset; no inferred sea connections")
 	}
 
 	return dataset, ctx.Err()
