@@ -21,7 +21,6 @@ func areaQuery(b logistics.Bounds) string {
 		`nwr["railway"~"^(station|yard|container_terminal)$"]`,
 		`nwr["industrial"~"^(port|intermodal_freight_terminal)$"]`,
 		`nwr["cargo"]`, `nwr["port"]`, `nwr["harbour"="yes"]`, `nwr["landuse"="port"]`,
-		`nwr["aeroway"~"^(aerodrome|cargo|cargo_terminal|terminal)$"]`,
 		`way["railway"="rail"]`, `way["waterway"~"^(river|canal)$"]`,
 	}
 	q := "[out:xml][timeout:180];("

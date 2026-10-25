@@ -68,7 +68,7 @@ func candidate(t map[string]string) bool {
 		return true
 	}
 
-	for _, key := range []string{"aeroway", "industrial", "port", "cargo", "harbour"} {
+	for _, key := range []string{"industrial", "port", "cargo", "harbour"} {
 		if t[key] != "" {
 			return true
 		}

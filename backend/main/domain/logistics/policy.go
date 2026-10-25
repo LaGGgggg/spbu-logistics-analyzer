@@ -130,11 +130,6 @@ func (p FreightPolicy) Classify(f Feature, references []Reference) (LogisticsNod
 		node.Kind = "port"
 	}
 
-	if t["aeroway"] == "cargo" || t["aeroway"] == "cargo_terminal" || (cargo && (t["aeroway"] == "aerodrome" || t["aeroway"] == "terminal")) {
-		node.Modes = append(node.Modes, TransportAir)
-		node.Kind = "cargo_airport"
-	}
-
 	if len(node.Modes) == 0 {
 		return LogisticsNode{}, false
 	}
