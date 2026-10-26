@@ -19,11 +19,8 @@ func areaQuery(b logistics.Bounds) string {
 	bbox := fmt.Sprintf("(%g,%g,%g,%g)", b.South, b.West, b.North, b.East)
 	selectors := []string{
 		`nwr["railway"~"^(station|yard|container_terminal)$"]`,
-		`nwr["industrial"~"^(warehouse|logistics|port|intermodal_freight_terminal)$"]`,
+		`nwr["industrial"~"^(port|intermodal_freight_terminal)$"]`,
 		`nwr["cargo"]`, `nwr["port"]`, `nwr["harbour"="yes"]`, `nwr["landuse"="port"]`,
-		`nwr["aeroway"~"^(aerodrome|cargo|cargo_terminal|terminal)$"]`,
-		`nwr["building"="warehouse"]`, `nwr["man_made"="distribution_centre"]`,
-		`way["highway"~"^(motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|unclassified|residential|service|living_street)$"]`,
 		`way["railway"="rail"]`, `way["waterway"~"^(river|canal)$"]`,
 	}
 	q := "[out:xml][timeout:180];("

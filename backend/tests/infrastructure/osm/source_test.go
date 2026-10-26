@@ -107,7 +107,7 @@ func TestCatalogResolvesPathsAndRejectsInvalidPolicy(t *testing.T) {
 func TestIncompleteWayDoesNotCreateShortcut(t *testing.T) {
 
 	path := filepath.Join(t.TempDir(), "bad.osm")
-	content := `<osm version="0.6"><node id="1" lat="60" lon="30"/><node id="3" lat="60" lon="31"/><way id="10"><nd ref="1"/><nd ref="2"/><nd ref="3"/><tag k="highway" v="primary"/></way></osm>`
+	content := `<osm version="0.6"><node id="1" lat="60" lon="30"/><node id="3" lat="60" lon="31"/><way id="10"><nd ref="1"/><nd ref="2"/><nd ref="3"/><tag k="railway" v="rail"/></way></osm>`
 
 	if err := os.WriteFile(path, []byte(content), 0600); err != nil {
 		t.Fatal(err)

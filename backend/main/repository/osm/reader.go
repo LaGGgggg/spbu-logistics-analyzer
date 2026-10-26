@@ -64,7 +64,11 @@ func tagsMap(tags osm.Tags) map[string]string {
 
 func candidate(t map[string]string) bool {
 
-	for _, key := range []string{"railway", "aeroway", "industrial", "building", "port", "cargo", "harbour", "man_made"} {
+	if t["railway"] != "" && t["railway"] != "rail" {
+		return true
+	}
+
+	for _, key := range []string{"industrial", "port", "cargo", "harbour"} {
 		if t[key] != "" {
 			return true
 		}
@@ -81,14 +85,6 @@ func trackMode(t map[string]string) (logistics.TransportMode, bool) {
 
 	if t["railway"] == "rail" && t["railway:traffic_mode"] != "passenger" {
 		return logistics.TransportRail, true
-	}
-
-	if slices.Contains([]string{"motorway", "motorway_link", "trunk", "trunk_link", "primary", "primary_link", "secondary", "secondary_link", "tertiary", "tertiary_link", "unclassified", "residential", "service", "living_street"}, t["highway"]) {
-		if t["motor_vehicle"] == "no" || t["motorcar"] == "no" {
-			return "", false
-		}
-
-		return logistics.TransportRoad, true
 	}
 
 	if t["waterway"] == "river" || t["waterway"] == "canal" {
@@ -259,7 +255,7 @@ func readOSM(ctx context.Context, path string, limit int) (logistics.Dataset, er
 				slices.Reverse(geometry)
 			}
 
-			directed := oneway == "yes" || oneway == "1" || oneway == "true" || oneway == "-1" || (mode == logistics.TransportRoad && t["junction"] == "roundabout" && oneway != "no")
+			directed := oneway == "yes" || oneway == "1" || oneway == "true" || oneway == "-1"
 			result.Tracks = append(result.Tracks, logistics.Track{ID: fmt.Sprintf("osm_way:%d", id), Mode: mode, Points: geometry, OneWay: directed})
 		}
 

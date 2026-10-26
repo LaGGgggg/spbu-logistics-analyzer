@@ -13,7 +13,7 @@ import (
 )
 
 func fixture() logistics.LogisticsGraph {
-	return logistics.LogisticsGraph{ID: "g", RegionID: "r", Nodes: []logistics.LogisticsNode{{ID: "a", Name: "=SUM(1,2)"}, {ID: "b", Name: "Порт & терминал"}, {ID: "isolated"}}, Edges: []logistics.LogisticsEdge{{ID: "e1", FromNodeID: "a", ToNodeID: "b", Mode: logistics.TransportRoad, DistanceKM: 3, Directed: true, Geometry: []logistics.Coordinates{{Longitude: 30, Latitude: 60}, {Longitude: 31, Latitude: 61}}}, {ID: "e2", FromNodeID: "a", ToNodeID: "b", Mode: logistics.TransportRail, DistanceKM: 2, Directed: true}}}
+	return logistics.LogisticsGraph{ID: "g", RegionID: "r", Nodes: []logistics.LogisticsNode{{ID: "a", Name: "=SUM(1,2)"}, {ID: "b", Name: "Порт & терминал"}, {ID: "isolated"}}, Edges: []logistics.LogisticsEdge{{ID: "e1", FromNodeID: "a", ToNodeID: "b", Mode: logistics.TransportRiver, DistanceKM: 3, Directed: true, Geometry: []logistics.Coordinates{{Longitude: 30, Latitude: 60}, {Longitude: 31, Latitude: 61}}}, {ID: "e2", FromNodeID: "a", ToNodeID: "b", Mode: logistics.TransportRail, DistanceKM: 2, Directed: true}}}
 }
 
 func TestExports(t *testing.T) {
