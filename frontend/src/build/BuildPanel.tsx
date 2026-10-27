@@ -1,3 +1,5 @@
+import { useState, type FormEvent } from "react";
+import { searchPlaces, type Place } from "@/api/geocode";
 import type { BBox } from "@/components/map/BBoxDrawer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,8 +13,36 @@ type BuildPanelProps = {
     onToggleDraw: () => void
     onClearBBox: () => void
     onBuild: () => void
+    onSelectPlace: (p: Place) => void
 }
-export function BuildPanel({ bbox, drawMode, building, error, onToggleDraw, onClearBBox, onBuild }: BuildPanelProps) {
+export function BuildPanel({ bbox, drawMode, building, error, onToggleDraw, onClearBBox, onBuild, onSelectPlace}: BuildPanelProps) {
+    const [query, setQuery] = useState('')
+    const [places, setPlaces] = useState<Place[]>([])
+    const [searching, setSearching] = useState(false)
+    const [searchError, setSearchError] = useState<string | null>(null)
+
+
+
+    async function handleSearch(event: FormEvent) {
+        event.preventDefault()
+        const clean = query.trim()
+        if (!clean) return
+        setSearching(true)
+        setSearchError(null)
+        setPlaces([])
+
+        try {
+            const found = await searchPlaces(clean)
+            setPlaces(found)
+            if (found.length === 0) setSearchError('Ничего не найдено')
+        } catch (e) {
+            setSearchError(e instanceof Error ? e.message : 'Ошибка поиска')
+        } finally {
+            setSearching(false)
+        }
+    }
+
+
 
     return (
         <div>
@@ -25,8 +55,28 @@ export function BuildPanel({ bbox, drawMode, building, error, onToggleDraw, onCl
 
             <div className="flex flex-col p-4 gap-4">
                 <div className="flex flex-col gap-2">
-                    <Input className="h-10" placeholder="Введите регион" />
 
+                    <form onSubmit={handleSearch}>
+                        <Input
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            disabled={searching}
+                            className="h-10" placeholder="Введите регион и нажмите Enter" />
+                    </form>
+
+                    {searching && <p className="text-xs text-muted-foreground">Ищем...</p>}
+                    {searchError && <p className="text-xs text-destructive" role="alert">{searchError}</p>}
+
+                    {places.map((place) => (
+                        <button
+                            key={place.id}
+                            type="button"
+                            className="rounded-md border p-2 text-left text-sm hover:bg-muted"
+                            onClick={() => { onSelectPlace(place); setPlaces([]) }}
+                        >
+                            {place.name}
+                        </button>
+                    ))}
 
                     <Button
                         variant={drawMode ? "default" : "secondary"}
@@ -60,7 +110,7 @@ export function BuildPanel({ bbox, drawMode, building, error, onToggleDraw, onCl
                 </Button>
 
                 {!bbox && (
-                    <p className="text-xs text-muted-foreground">Сначала выделите область на карте</p>
+                    <p className="text-xs text-muted-foreground">Найдите регион или выделите область на карте</p>
                 )}
 
                 {error && (
