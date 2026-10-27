@@ -2,6 +2,7 @@ import 'leaflet/dist/leaflet.css'
 import type { GeoJsonObject } from 'geojson'
 import { MapContainer, TileLayer, GeoJSON, ScaleControl, Rectangle } from 'react-leaflet'
 import { FitToRegion } from './FitToRegion'
+import { RegionsLayer } from './RegionsLayer'
 import { BBoxDrawer, type BBox } from './BBoxDrawer'
 import { useMemo } from 'react'
 import type { LogisticsGraph, TransportMode } from '@/api/types'
@@ -9,6 +10,7 @@ import { GraphNodes } from './GraphNodes'
 import { FitToNodes } from './FitToNodes'
 import { GraphEdges } from './GraphEdges'
 import { UNKNOWN_KIND } from '@/lib/kinds'
+import type { Place } from '@/api/geocode'
 
 
 
@@ -28,12 +30,24 @@ type MapViewProps = {
     visibleModes?: Set<TransportMode>
     hiddenKinds?: Set<string>
     showEdges?: boolean
+    onSelectPlace?: (p: Place) => void
 }
 
 const DEFAULT_CENTER: [number, number] = [61, 90]
 const DEFAULT_ZOOM = 3
 
-export function MapView({ region, bbox, graph, visibleModes, hiddenKinds, showEdges = true, drawMode = false, onDrawn = () => { }, onDrawCancel = () => { } }: MapViewProps) {
+export function MapView({ 
+    region,
+     bbox,
+      graph,
+       visibleModes,
+        hiddenKinds,
+        showEdges = true,
+        drawMode = false,
+        onDrawn = () => { },
+        onDrawCancel = () => { },
+        onSelectPlace = () => { }
+     }: MapViewProps) {
 
     
     const visibleNodes = useMemo(() => {
@@ -75,6 +89,8 @@ export function MapView({ region, bbox, graph, visibleModes, hiddenKinds, showEd
 
             <ScaleControl position="bottomleft" imperial={false} />
 
+            <RegionsLayer active={!drawMode} lockedId={graph && region ? Number(region.id) : null} onSelect={onSelectPlace} />
+
 
             <BBoxDrawer active={drawMode} onDrawn={onDrawn} onCancel={onDrawCancel} />
 
@@ -95,9 +111,10 @@ export function MapView({ region, bbox, graph, visibleModes, hiddenKinds, showEd
             {region && (
                 <>
                     <GeoJSON
-                        key={region.id}
+                        key={`${region.id}-${graph ? 'built' : 'draft'}`}
                         data={region.geometry}
-                        style={{ color: '#2563eb', weight: 2, fillOpacity: 0.08 }}
+                        interactive={false}
+                        style={{ color: '#2563eb', weight: 2, fillOpacity: graph ? 0 : 0.08 }}
                     />
                     <FitToRegion geometry={region.geometry} />
                 </>

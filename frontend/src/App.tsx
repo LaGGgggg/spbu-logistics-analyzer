@@ -1,4 +1,4 @@
-import { MapView } from '@/components/map/MapView'
+import { MapView, type MapRegion } from '@/components/map/MapView'
 import { AppLayout } from './components/layout/AppLayout'
 import { Header } from './header/Header'
 import { BuildPanel } from './build/BuildPanel'
@@ -12,6 +12,7 @@ import { getApiErrorMessage } from './api/errors';
 import type { LogisticsGraph, TransportMode } from './api/types';
 import { UNKNOWN_KIND } from './lib/kinds'
 import { RightPanel } from "@/components/right-panel/RightPanel";
+import type { Place } from './api/geocode';
 
 
 function App() {
@@ -24,6 +25,7 @@ function App() {
   const [visibleModes, setVisibleModes] = useState<Set<TransportMode>>(() => new Set(MODES))
   const [hiddenKinds, setHiddenKinds] = useState<Set<string>>(() => new Set())
   const [showEdges, setShowEdges] = useState(true)
+  const [region, setRegion] = useState<MapRegion | null>(null)
 
 
   const toggleMode = useCallback((mode: TransportMode) => {
@@ -87,10 +89,15 @@ function App() {
 
   const handleDrawn = useCallback((b: BBox) => {
     setBBox(b)
+    setRegion(null)
     setDrawMode(false)
   }, [])
   const cancelDraw = useCallback(() => setDrawMode(false), [])
 
+  const handleSelectPlace = useCallback((p: Place) => {
+    setBBox(p.bounds)
+    setRegion({ id: String(p.id), name: p.name, geometry: p.geometry })
+  }, [])
 
   return (
     <AppLayout
@@ -103,7 +110,8 @@ function App() {
             building={building}
             error={error}
             onToggleDraw={() => setDrawMode((v) => !v)}
-            onClearBBox={() => setBBox(null)}
+            onClearBBox={() => { setBBox(null); setRegion(null) }}
+            onSelectPlace={handleSelectPlace}
             onBuild={handleBuild}
           />
           {graph && (
@@ -131,6 +139,8 @@ function App() {
         onDrawCancel={cancelDraw}
         hiddenKinds={hiddenKinds}
         showEdges={showEdges}
+        region={region}
+        onSelectPlace={handleSelectPlace}
 
       />
 
