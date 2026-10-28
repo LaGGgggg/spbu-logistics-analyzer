@@ -1,4 +1,5 @@
 import type { LogisticsGraph } from "@/api/types";
+import { kindLabel, UNKNOWN_KIND } from "@/lib/kinds";
 
 const transportTypes = [
     { mode: "rail", label: "Ж/д", color: "bg-slate-700" },
@@ -17,8 +18,8 @@ export function StatisticsPanel({ graph }: StatisticsPanelProps) {
 
     const averageLength =
         graph && graph.edges.length > 0 && totalLength !== null
-        ? totalLength / graph.edges.length
-        : null;
+            ? totalLength / graph.edges.length
+            : null;
 
     const connectedPairs = new Set<string>();
 
@@ -77,6 +78,45 @@ export function StatisticsPanel({ graph }: StatisticsPanelProps) {
         }
     }
 
+    const transportStats = transportTypes.map((transport) => {
+        const edges = graph?.edges.filter(
+            (edge) => edge.mode === transport.mode
+        ) ?? [];
+
+        const totalLength = edges.reduce(
+            (sum, edge) => sum + edge.distance_km,
+            0
+        );
+
+        return {
+            ...transport,
+            edgeCount: edges.length,
+            totalLength,
+        };
+    });
+
+    const transportEdgeCount = transportStats.reduce(
+        (sum, transport) => sum + transport.edgeCount,
+        0
+    );
+
+    const kindCounts = new Map<string, number>();
+
+    for (const node of graph?.nodes ?? []) {
+        const kind = node.kind || UNKNOWN_KIND;
+
+        kindCounts.set(
+            kind,
+            (kindCounts.get(kind) ?? 0) + 1
+        );
+    }
+
+    const nodeTypeStats = Array.from(kindCounts, ([kind, count]) => ({
+        kind,
+        count,
+    })).sort((a, b) => b.count - a.count);
+
+    const maxKindCount = nodeTypeStats[0]?.count ?? 0;
 
     return (
         <section>
@@ -91,9 +131,7 @@ export function StatisticsPanel({ graph }: StatisticsPanelProps) {
                     </p>
 
                     <p className="mt-1 font-mono text-lg font-semibold">
-                        <p className="mt-1 font-mono text-lg font-semibold">
-                            {graph ? graph.nodes.length.toLocaleString("ru-RU") : "—"}
-                        </p>
+                        {graph ? graph.nodes.length.toLocaleString("ru-RU") : "—"}
                     </p>
                 </div>
 
@@ -169,6 +207,150 @@ export function StatisticsPanel({ graph }: StatisticsPanelProps) {
 
             </div>
 
+            <div className="mt-6 border-t pt-4">
+
+                <div className="mb-3 flex items-center justify-between">
+                    <h3 className="text-sm font-semibold">
+                        По видам транспорта
+                    </h3>
+
+                    <span className="text-xs text-muted-foreground">
+                        рёбер · км
+                    </span>
+                </div>
+
+                <div className="space-y-3">
+                    {transportStats.map((transport) => (
+                        <div key={transport.mode}>
+                            <div className="flex items-center justify-between gap-2">
+                                <span className="text-sm">
+                                    {transport.label}
+                                </span>
+
+                                <span className="font-mono text-xs text-muted-foreground">
+                                    {graph
+                                        ? `${transport.edgeCount.toLocaleString("ru-RU")} · ${transport.totalLength.toLocaleString("ru-RU", {
+                                            maximumFractionDigits: 1,
+                                        })
+                                        } км`
+                                        : "—"}
+                                </span>
+                            </div>
+
+                            <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted">
+                                <div
+                                    className={`h-full rounded-full ${transport.color}`}
+                                    style={{
+                                        width: `${transportEdgeCount > 0
+                                            ? (transport.edgeCount / transportEdgeCount) * 100
+                                            : 0
+                                            }%`,
+                                    }}
+                                />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <div className="mt-6 border-t pt-4">
+                <h3 className="mb-3 text-sm font-semibold">
+                    Узлы по типам
+                </h3>
+
+                {nodeTypeStats.map((item) => (
+                    <div
+                        key={item.kind}
+                        className="grid grid-cols-[100px_1fr_36px] items-center gap-2"
+                    >
+                        <span className="text-xs">
+                            {kindLabel(item.kind)}
+                        </span>
+
+                        <div className="h-2 overflow-hidden rounded-full bg-muted">
+                            <div
+                                className="h-full rounded-full bg-slate-600"
+                                style={{
+                                    width: `${maxKindCount > 0
+                                        ? (item.count / maxKindCount) * 100
+                                        : 0
+                                        }%`,
+                                }}
+                            />
+                        </div>
+
+                        <span className="text-right font-mono text-xs">
+                            {item.count.toLocaleString("ru-RU")}
+                        </span>
+                    </div>
+                ))}
+
+                {!graph && (
+                    <p className="text-sm text-muted-foreground">
+                        Сначала постройте граф.
+                    </p>
+                )}
+            </div>
+
+            <div className="mt-6 border-t pt-4">
+                <h3 className="mb-3 text-sm font-semibold">
+                    Качество данных
+                </h3>
+
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                    <div className="flex justify-between gap-2">
+                        <span className="text-muted-foreground">Кандидатов</span>
+                        <span className="font-mono">
+                            {graph
+                                ? graph.coverage.candidates.toLocaleString("ru-RU")
+                                : "—"}
+                        </span>
+                    </div>
+
+                    <div className="flex justify-between gap-2">
+                        <span className="text-muted-foreground">Принято</span>
+                        <span className="font-mono">
+                            {graph
+                                ? graph.coverage.accepted.toLocaleString("ru-RU")
+                                : "—"}
+                        </span>
+                    </div>
+
+                    <div className="flex justify-between gap-2">
+                        <span className="text-muted-foreground">Отклонено</span>
+                        <span className="font-mono">
+                            {graph
+                                ? graph.coverage.rejected.toLocaleString("ru-RU")
+                                : "—"}
+                        </span>
+                    </div>
+
+                    <div className="flex justify-between gap-2">
+                        <span className="text-muted-foreground">Предупреждений</span>
+                        <span className="font-mono">
+                            {graph
+                                ? (graph.coverage.warnings?.length ?? 0).toLocaleString("ru-RU")
+                                : "—"}
+                        </span>
+                    </div>
+                </div>
+
+                {(graph?.coverage.warnings?.length ?? 0) > 0 && (
+                    <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-950">
+                        <p className="mb-2 text-xs font-semibold">
+                            Предупреждения источника
+                        </p>
+
+                        <ul className="list-disc space-y-1 pl-4 text-xs">
+                            {(graph?.coverage.warnings ?? []).map((warning, index) => (
+                                <li key={`${index}-${warning}`}>
+                                    {warning}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+            </div>
 
         </section>
     );

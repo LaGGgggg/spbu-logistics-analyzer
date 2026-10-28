@@ -31,6 +31,19 @@ export type LogisticsGraph = {
     bounds?: Bounds
     nodes: LogisticsNode[]
     edges: LogisticsEdge[]
+    coverage: Coverage
+}
+
+export type Coverage = {
+    candidates: number
+    accepted: number
+    rejected: number
+    reference_total: number
+    reference_matched: number
+    unmatched_reference_ids: string[] | null
+    unrouted_node_modes: string[] | null
+    sources: string[] | null
+    warnings: string[] | null
 }
 
 export type Job = {
