@@ -1,7 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import { StatisticsPanel } from "./StatisticsPanel";
+import type { LogisticsGraph } from "@/api/types";
 
-export function RightPanel() {
+type RightPanelProps = {
+    graph: LogisticsGraph | null;
+};
+
+export function RightPanel({ graph }: RightPanelProps) {
     const [activeTab, setActiveTab] = useState("statistics");
 
     return (
@@ -45,7 +51,7 @@ export function RightPanel() {
             </div>
 
             <div className="mt-4">
-                {activeTab === "statistics" && <p>Блок 1</p>}
+                {activeTab === "statistics" && <StatisticsPanel graph={graph} />}
                 {activeTab === "metrics" && <p>Блок 2</p>}
                 {activeTab === "node" && <p>Блок 3</p>}
             </div>

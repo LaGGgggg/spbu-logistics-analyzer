@@ -128,7 +128,7 @@ function App() {
           )}
         </>
       }
-      right={<RightPanel />}
+      right={<RightPanel graph={graph} />}
     >
       <MapView
         bbox={bbox}
