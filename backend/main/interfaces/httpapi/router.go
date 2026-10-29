@@ -12,6 +12,7 @@ import (
 
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/domain/logistics"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/interfaces/export"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/service/graph_build_service"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/service/logistics_service"
 	"github.com/gin-gonic/gin"
 )
@@ -153,7 +154,26 @@ func NewRouter(service logistics_service.Queries) *gin.Engine {
 			graph.Edges = edges
 		}
 
+		if graph.Metrics == nil {
+			graph_build_service.CalculateMetrics(&graph)
+		}
+
 		c.JSON(http.StatusOK, graph)
+	})
+	router.GET("/api/graphs/:id/metrics", func(c *gin.Context) {
+		graph, err := service.GetGraph(c.Request.Context(), c.Param("id"))
+
+		if err != nil {
+			respondError(c, err)
+
+			return
+		}
+
+		if graph.Metrics == nil {
+			graph_build_service.CalculateMetrics(&graph)
+		}
+
+		c.JSON(http.StatusOK, graph.Metrics)
 	})
 	router.GET("/api/graphs/:id/coverage", func(c *gin.Context) {
 		graph, err := service.GetGraph(c.Request.Context(), c.Param("id"))

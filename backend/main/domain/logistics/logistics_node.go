@@ -12,6 +12,9 @@ type LogisticsNode struct {
 	Coordinates Coordinates     `json:"coordinates"`
 	Modes       []TransportMode `json:"modes"`
 	ExternalIDs []ExternalID    `json:"external_ids"`
+	PageRank    float64         `json:"page_rank,omitempty"`
+	Betweenness float64         `json:"betweenness,omitempty"`
+	PowerLoad   int             `json:"power_load,omitempty"`
 }
 
 func (n LogisticsNode) Validate() error {

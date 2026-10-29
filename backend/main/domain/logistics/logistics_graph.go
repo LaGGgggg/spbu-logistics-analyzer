@@ -12,6 +12,7 @@ type LogisticsGraph struct {
 	RegionID string          `json:"region_id"`
 	Nodes    []LogisticsNode `json:"nodes"`
 	Edges    []LogisticsEdge `json:"edges"`
+	Metrics  *GraphMetrics   `json:"metrics,omitempty"`
 }
 
 func (g LogisticsGraph) Validate() error {
