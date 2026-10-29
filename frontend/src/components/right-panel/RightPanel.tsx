@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
-import { StatisticsPanel } from "./StatisticsPanel";
+import { StatisticsPanel } from "./statistics/StatisticsPanel";
 import type { LogisticsGraph } from "@/api/types";
 
 type RightPanelProps = {
