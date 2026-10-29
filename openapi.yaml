@@ -271,6 +271,27 @@ paths:
           $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalError'
+  /api/graphs/{id}/metrics:
+    get:
+      operationId: getGraphMetrics
+      tags: [Graphs]
+      summary: Получить вычисленные сетевые метрики графа
+      description: Возвращает PageRank, Betweenness Centrality и Power Load (степень узлов в порядке возрастания).
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Метрики графа
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GraphMetrics'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/graphs/{id}/export/{format}:
     get:
       operationId: exportGraph
@@ -524,6 +545,9 @@ components:
             $ref: '#/components/schemas/ExternalID'
         kind: {type: string}
         cargo: {type: string}
+        page_rank: {type: number}
+        betweenness: {type: number}
+        power_load: {type: integer}
         sources:
           type: array
           items: {type: string}
@@ -571,6 +595,38 @@ components:
             $ref: '#/components/schemas/LogisticsEdge'
         coverage:
           $ref: '#/components/schemas/Coverage'
+        metrics:
+          $ref: '#/components/schemas/GraphMetrics'
+    GraphMetrics:
+      type: object
+      required: [page_rank, betweenness, power_load]
+      properties:
+        page_rank:
+          type: object
+          additionalProperties:
+            type: number
+          description: Значения PageRank для каждого узла.
+        betweenness:
+          type: object
+          additionalProperties:
+            type: number
+          description: Нормализованная посредническая центральность (Betweenness Centrality).
+        power_load:
+          type: array
+          items:
+            $ref: '#/components/schemas/NodePowerLoad'
+          description: Список узлов с числом связей в порядке возрастания.
+    NodePowerLoad:
+      type: object
+      required: [node_id, name, degree]
+      properties:
+        node_id:
+          type: string
+        name:
+          type: string
+        degree:
+          type: integer
+          minimum: 0
     NullableStringArray:
       type: [array, 'null']
       items: {type: string}
