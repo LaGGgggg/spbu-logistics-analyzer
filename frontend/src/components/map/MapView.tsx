@@ -1,16 +1,18 @@
 import 'leaflet/dist/leaflet.css'
 import type { GeoJsonObject } from 'geojson'
-import { MapContainer, TileLayer, GeoJSON, ScaleControl, Rectangle } from 'react-leaflet'
+import { MapContainer, TileLayer, GeoJSON, ScaleControl, Rectangle, Pane } from 'react-leaflet'
 import { FitToRegion } from './FitToRegion'
 import { RegionsLayer } from './RegionsLayer'
 import { BBoxDrawer, type BBox } from './BBoxDrawer'
 import { useMemo } from 'react'
-import type { LogisticsGraph, TransportMode } from '@/api/types'
+import type { Coordinates, LogisticsGraph, TransportMode } from '@/api/types'
 import { GraphNodes } from './GraphNodes'
 import { FitToNodes } from './FitToNodes'
 import { GraphEdges } from './GraphEdges'
 import { UNKNOWN_KIND } from '@/lib/kinds'
 import type { Place } from '@/api/geocode'
+import { MapResizer } from './MapResizer'
+import { PanToPoint } from './PanToPoint'
 
 
 
@@ -31,25 +33,31 @@ type MapViewProps = {
     hiddenKinds?: Set<string>
     showEdges?: boolean
     onSelectPlace?: (p: Place) => void
+    selectedNodeId?: string | null
+    onSelectNode?: (id: string) => void
+    focusPoint?: Coordinates | null
 }
 
 const DEFAULT_CENTER: [number, number] = [61, 90]
 const DEFAULT_ZOOM = 3
 
-export function MapView({ 
+export function MapView({
     region,
-     bbox,
-      graph,
-       visibleModes,
-        hiddenKinds,
-        showEdges = true,
-        drawMode = false,
-        onDrawn = () => { },
-        onDrawCancel = () => { },
-        onSelectPlace = () => { }
-     }: MapViewProps) {
+    bbox,
+    graph,
+    visibleModes,
+    hiddenKinds,
+    showEdges = true,
+    drawMode = false,
+    onDrawn = () => { },
+    onDrawCancel = () => { },
+    onSelectPlace = () => { },
+    selectedNodeId = null,
+    onSelectNode,
+    focusPoint = null,
+}: MapViewProps) {
 
-    
+
     const visibleNodes = useMemo(() => {
         if (!graph) return []
         return graph.nodes.filter((n) => {
@@ -79,7 +87,6 @@ export function MapView({
             className='h-full w-full'
             worldCopyJump
             attributionControl={false}
-            preferCanvas
         >
             <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -88,8 +95,9 @@ export function MapView({
             />
 
             <ScaleControl position="bottomleft" imperial={false} />
-
-            <RegionsLayer active={!drawMode} lockedId={graph && region ? Number(region.id) : null} onSelect={onSelectPlace} />
+            <MapResizer />
+            <PanToPoint target={focusPoint} />
+            <RegionsLayer active={!drawMode} hoverFill={!graph} lockedId={graph && region ? Number(region.id) : null} onSelect={onSelectPlace} />
 
 
             <BBoxDrawer active={drawMode} onDrawn={onDrawn} onCancel={onDrawCancel} />
@@ -97,15 +105,16 @@ export function MapView({
             {bbox && (
                 <Rectangle
                     bounds={[[bbox.south, bbox.west], [bbox.north, bbox.east]]}
-                    pathOptions={{ color: '#2563eb', weight: 1.5, dashArray: '6 6', fillOpacity: 0.05 }}
+                    pathOptions={{ color: '#2563eb', weight: 1.5, dashArray: '6 6', fill: !graph, fillOpacity: 0.05 }}
                     interactive={false}
                 />
             )}
 
             {graph && <FitToNodes nodes={graph.nodes} />}
-            <GraphEdges edges={visibleEdges} />
-            <GraphNodes nodes={visibleNodes} />
-
+            <Pane name="graph" style={{ zIndex: 450 }}>
+                <GraphEdges edges={visibleEdges} />
+                <GraphNodes nodes={visibleNodes} selectedId={selectedNodeId} onSelect={onSelectNode} />
+            </Pane>
 
 
             {region && (

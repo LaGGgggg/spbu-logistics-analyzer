@@ -9,9 +9,9 @@ import type { BBox } from './components/map/BBoxDrawer';
 import { buildGraph, getGraph } from './api/graph';
 import axios from 'axios';
 import { getApiErrorMessage } from './api/errors';
-import type { LogisticsGraph, TransportMode } from './api/types';
+import type { Coordinates, LogisticsGraph, TransportMode } from './api/types';
 import { UNKNOWN_KIND } from './lib/kinds'
-import { RightPanel } from "@/components/right-panel/RightPanel";
+import { RightPanel, type RightTab } from "@/components/right-panel/RightPanel";
 import type { Place } from './api/geocode';
 
 
@@ -26,6 +26,10 @@ function App() {
   const [hiddenKinds, setHiddenKinds] = useState<Set<string>>(() => new Set())
   const [showEdges, setShowEdges] = useState(true)
   const [region, setRegion] = useState<MapRegion | null>(null)
+  const [rightOpen, setRightOpen] = useState(false)
+  const [rightTab, setRightTab] = useState<RightTab>('statistics')
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+  const [focusPoint, setFocusPoint] = useState<Coordinates | null>(null)
 
 
   const toggleMode = useCallback((mode: TransportMode) => {
@@ -74,6 +78,7 @@ function App() {
 
     setBuilding(true)
     setError(null)
+    setSelectedNodeId(null)
 
     try {
       const graphId = await buildGraph(bbox, controller.signal)
@@ -87,6 +92,12 @@ function App() {
     }
   }
 
+  const handleCancelBuild = useCallback(() => {
+    abortRef.current?.abort()
+    abortRef.current = null
+    setBuilding(false)
+  }, [])
+
   const handleDrawn = useCallback((b: BBox) => {
     setBBox(b)
     setRegion(null)
@@ -96,16 +107,31 @@ function App() {
 
   const handleSelectPlace = useCallback((p: Place) => {
     setBBox(p.bounds)
-    setRegion({ id: String(p.id), name: p.name, geometry: p.geometry })
+    setRegion({ id: String(p.id), name: p.name.split(',')[0], geometry: p.geometry })
   }, [])
+
+  const handleSelectNode = useCallback((id: string) => {
+    setSelectedNodeId(id)
+    setRightTab('node')
+    setRightOpen(true)
+  }, [])
+
+  const handleFocusNode = useCallback((id: string) => {
+    handleSelectNode(id)
+    const node = graph?.nodes.find((n) => n.id === id)
+    if (node) setFocusPoint({ ...node.coordinates })
+  }, [graph, handleSelectNode])
 
   return (
     <AppLayout
-      header={<Header graphId={graph?.id} />}
+      rightOpen={rightOpen}
+      onRightOpenChange={setRightOpen}
+      header={<Header graphId={graph?.id} regionName={region?.name} />}
       left={
         <>
           <BuildPanel
             bbox={bbox}
+            regionName={region?.name}
             drawMode={drawMode}
             building={building}
             error={error}
@@ -113,6 +139,7 @@ function App() {
             onClearBBox={() => { setBBox(null); setRegion(null) }}
             onSelectPlace={handleSelectPlace}
             onBuild={handleBuild}
+            onCancelBuild={handleCancelBuild}
           />
           {graph && (
             <LayersPanel
@@ -128,7 +155,15 @@ function App() {
           )}
         </>
       }
-      right={<RightPanel graph={graph} />}
+      right={
+        <RightPanel
+          graph={graph}
+          activeTab={rightTab}
+          onTabChange={setRightTab}
+          selectedNodeId={selectedNodeId}
+          onSelectNode={handleFocusNode}
+        />
+      }
     >
       <MapView
         bbox={bbox}
@@ -141,7 +176,9 @@ function App() {
         showEdges={showEdges}
         region={region}
         onSelectPlace={handleSelectPlace}
-
+        selectedNodeId={selectedNodeId}
+        onSelectNode={handleSelectNode}
+        focusPoint={focusPoint}
       />
 
 

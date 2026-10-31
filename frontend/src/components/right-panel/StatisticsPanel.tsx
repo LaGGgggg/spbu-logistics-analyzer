@@ -1,11 +1,56 @@
 import type { LogisticsGraph } from "@/api/types";
 import { kindLabel, UNKNOWN_KIND } from "@/lib/kinds";
+import { MODES, MODE_COLOR, MODE_LABEL } from "@/lib/modes";
+import { useMemo } from "react";
 
-const transportTypes = [
-    { mode: "rail", label: "Ж/д", color: "bg-slate-700" },
-    { mode: "sea", label: "Море", color: "bg-blue-700" },
-    { mode: "river", label: "Река", color: "bg-sky-500" },
-];
+const transportTypes = MODES.map((mode) => ({
+    mode,
+    label: MODE_LABEL[mode],
+    color: MODE_COLOR[mode],
+}));
+
+function computeTopology(graph: LogisticsGraph) {
+    const pairs = new Set<string>();
+    const neighbors = new Map<string, string[]>();
+
+    for (const node of graph.nodes) neighbors.set(node.id, []);
+
+    for (const edge of graph.edges) {
+        neighbors.get(edge.from_node_id)?.push(edge.to_node_id);
+        neighbors.get(edge.to_node_id)?.push(edge.from_node_id);
+
+        if (edge.from_node_id === edge.to_node_id) continue;
+
+        pairs.add(`${edge.from_node_id}|${edge.to_node_id}`);
+        if (!edge.directed) pairs.add(`${edge.to_node_id}|${edge.from_node_id}`);
+    }
+
+    const nodeCount = graph.nodes.length;
+    const density = nodeCount > 1 ? pairs.size / (nodeCount * (nodeCount - 1)) : null;
+
+    const visited = new Set<string>();
+    let componentCount = 0;
+
+    for (const startId of neighbors.keys()) {
+        if (visited.has(startId)) continue;
+
+        componentCount++;
+        const stack = [startId];
+        visited.add(startId);
+
+        while (stack.length > 0) {
+            const currentId = stack.pop()!;
+            for (const neighborId of neighbors.get(currentId) ?? []) {
+                if (!visited.has(neighborId)) {
+                    visited.add(neighborId);
+                    stack.push(neighborId);
+                }
+            }
+        }
+    }
+
+    return { density, componentCount };
+}
 
 type StatisticsPanelProps = {
     graph: LogisticsGraph | null;
@@ -21,62 +66,12 @@ export function StatisticsPanel({ graph }: StatisticsPanelProps) {
             ? totalLength / graph.edges.length
             : null;
 
-    const connectedPairs = new Set<string>();
-
-    for (const edge of graph?.edges ?? []) {
-        if (edge.from_node_id === edge.to_node_id) continue;
-
-        connectedPairs.add(
-            JSON.stringify([edge.from_node_id, edge.to_node_id])
-        );
-
-        if (!edge.directed) {
-            connectedPairs.add(
-                JSON.stringify([edge.to_node_id, edge.from_node_id])
-            );
-        }
-    }
-
-    const nodeCount = graph?.nodes.length ?? 0;
-
-    const density = graph && nodeCount > 1
-        ? connectedPairs.size / (nodeCount * (nodeCount - 1))
-        : null;
-
-    const neighbors = new Map<string, string[]>();
-
-    for (const node of graph?.nodes ?? []) {
-        neighbors.set(node.id, []);
-    }
-
-    for (const edge of graph?.edges ?? []) {
-        neighbors.get(edge.from_node_id)?.push(edge.to_node_id);
-        neighbors.get(edge.to_node_id)?.push(edge.from_node_id);
-    }
-
-
-    const visited = new Set<string>();
-    let componentCount = 0;
-
-    for (const nodeId of neighbors.keys()) {
-        if (visited.has(nodeId)) continue;
-
-        componentCount++;
-
-        const stack = [nodeId];
-        visited.add(nodeId);
-
-        while (stack.length > 0) {
-            const currentId = stack.pop()!;
-
-            for (const neighborId of neighbors.get(currentId) ?? []) {
-                if (!visited.has(neighborId)) {
-                    visited.add(neighborId);
-                    stack.push(neighborId);
-                }
-            }
-        }
-    }
+    const topology = useMemo(
+        () => (graph ? computeTopology(graph) : null),
+        [graph],
+    );
+    const density = topology?.density ?? null;
+    const componentCount = topology?.componentCount ?? 0;
 
     const transportStats = transportTypes.map((transport) => {
         const edges = graph?.edges.filter(
@@ -197,7 +192,7 @@ export function StatisticsPanel({ graph }: StatisticsPanelProps) {
 
                 <div className="rounded-md border bg-muted/50 p-3">
                     <p className="text-xs text-muted-foreground">
-                        Компонент связности
+                        Компонентов связности
                     </p>
 
                     <p className="mt-1 font-mono text-lg font-semibold">
@@ -239,8 +234,9 @@ export function StatisticsPanel({ graph }: StatisticsPanelProps) {
 
                             <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted">
                                 <div
-                                    className={`h-full rounded-full ${transport.color}`}
+                                    className="h-full rounded-full"
                                     style={{
+                                        backgroundColor: transport.color,
                                         width: `${transportEdgeCount > 0
                                             ? (transport.edgeCount / transportEdgeCount) * 100
                                             : 0
@@ -269,7 +265,7 @@ export function StatisticsPanel({ graph }: StatisticsPanelProps) {
 
                         <div className="h-2 overflow-hidden rounded-full bg-muted">
                             <div
-                                className="h-full rounded-full bg-slate-600"
+                                className="h-full rounded-full bg-primary"
                                 style={{
                                     width: `${maxKindCount > 0
                                         ? (item.count / maxKindCount) * 100
@@ -336,7 +332,7 @@ export function StatisticsPanel({ graph }: StatisticsPanelProps) {
                 </div>
 
                 {(graph?.coverage.warnings?.length ?? 0) > 0 && (
-                    <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-950">
+                    <div className="mt-3 rounded-md border border-signal/40 bg-signal/10 p-3">
                         <p className="mb-2 text-xs font-semibold">
                             Предупреждения источника
                         </p>

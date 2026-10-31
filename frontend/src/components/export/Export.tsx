@@ -18,6 +18,7 @@ const exportFormats = [
 
 export function Export({ graphId }: ExportProps) {
     const [isOpen, setIsOpen] = useState(false);
+    const [isMounted, setIsMounted] = useState(false);
     const [format, setFormat] = useState("nodes.csv");
     const [isDownloading, setIsDownloading] = useState(false);
 
@@ -55,15 +56,31 @@ export function Export({ graphId }: ExportProps) {
         <>
             <Button
                 className="h-10"
-                onClick={() => setIsOpen(true)}
+                onClick={() => {
+                    setIsMounted(true);
+                    setIsOpen(true);
+                }}
             >
                 <DownloadIcon />
                 Экспорт
             </Button>
 
-            {isOpen && (
-                <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4">
-                    <div className="w-full max-w-2xl rounded-sm border bg-background p-6 text-foreground">
+            {isMounted && (
+                <div
+                    className={`fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4 duration-200 [animation-fill-mode:forwards] ${
+                        isOpen ? "animate-in fade-in" : "animate-out fade-out"
+                    }`}
+                    onAnimationEnd={(event) => {
+                        if (event.target === event.currentTarget && !isOpen) setIsMounted(false);
+                    }}
+                >
+                    <div
+                        className={`w-full max-w-2xl rounded-sm border bg-background p-6 text-foreground duration-200 [animation-fill-mode:forwards] ${
+                            isOpen
+                                ? "animate-in fade-in zoom-in-95 slide-in-from-bottom-2"
+                                : "animate-out fade-out zoom-out-95 slide-out-to-bottom-2"
+                        }`}
+                    >
                         <div className="mb-6 flex items-start justify-between gap-4">
                             <div>
                                 <h2 className="text-xl font-semibold">
@@ -91,7 +108,7 @@ export function Export({ graphId }: ExportProps) {
                                     key={item.value}
                                     type="button"
                                     onClick={() => setFormat(item.value)}
-                                    className={`rounded-xl border-2 p-4 text-left ${
+                                    className={`rounded-sm border-2 p-4 text-left ${
                                         format === item.value
                                             ? "border-blue-700"
                                             : "border-border"

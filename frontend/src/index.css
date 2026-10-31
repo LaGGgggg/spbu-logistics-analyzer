@@ -182,3 +182,35 @@
 .leaflet-tooltip.node-label::before {
   display: none;
 }
+
+.leaflet-interactive:focus {
+  outline: none;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.leaflet-graph-pane > svg {
+  pointer-events: none;
+}
+
+.graph-node {
+  cursor: pointer;
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 150ms ease, stroke 200ms ease, stroke-width 200ms ease;
+}
+.graph-node:hover,
+.graph-node-active {
+  transform: scale(1.3);
+}
+
+.graph-node-active {
+  stroke: #F5A524;
+  stroke-width: 3px;
+}
+
