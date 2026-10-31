@@ -1,5 +1,6 @@
 import type { Bounds } from "./types";
-import type { GeoJsonObject, Polygon } from "geojson";
+import type { GeoJsonObject, MultiPolygon, Polygon } from "geojson";
+import { normalizeArea } from "@/lib/geo";
 
 
 export type Place = {
@@ -37,10 +38,13 @@ export async function searchPlaces(query: string, signal?: AbortSignal): Promise
             type: 'Polygon',
             coordinates: [[[west, south], [east, south], [east, north], [west, north], [west, south]]],
         }
-        const geometry: GeoJsonObject = isArea ? item.geojson! : rect
+        if (isArea) {
+            const area = normalizeArea(item.geojson as Polygon | MultiPolygon)
+            return { id: item.place_id, name: item.display_name, bounds: area.bounds, geometry: area.geometry }
+        }
 
 
-        return { id: item.place_id, name: item.display_name, bounds: { west, south, east, north }, geometry }
+        return { id: item.place_id, name: item.display_name, bounds: { west, south, east, north }, geometry: rect }
     })
 }
 

@@ -5,13 +5,17 @@ import { User } from 'lucide-react'
 
 type HeaderProps = {
     graphId?: string;
+    regionName?: string;
 };
 
-export function Header({ graphId }: HeaderProps) {
+export function Header({ graphId, regionName }: HeaderProps) {
     return (
-        <div className="flex w-full items-center justify-between">
+        <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-4">
             <Logo />
-            <div className='flex gap-2'>
+            <h1 className="max-w-[40vw] truncate text-center text-base font-semibold" title={regionName}>
+                {regionName}
+            </h1>
+            <div className='flex justify-end gap-2'>
                 <Export graphId={graphId} />
                 <Button className={"h-10"} variant={"secondary"}>
                     <User />

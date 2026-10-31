@@ -1,30 +1,36 @@
 import { useEffect, useRef, useState } from 'react'
 import { GeoJSON } from 'react-leaflet'
-import type { FeatureCollection } from 'geojson'
+import type { FeatureCollection, MultiPolygon, Polygon as GeoPolygon } from 'geojson'
 import type { GeoJSON as LeafletGeoJSON, Layer, Polygon, PathOptions } from 'leaflet'
 import type { Place } from '@/api/geocode'
+import { normalizeArea } from '@/lib/geo'
 
 const BASE: PathOptions = { color: '#64748b', weight: 0.8, fillOpacity: 0, opacity: 0.5 }
 const HOVER: PathOptions = { color: '#2563eb', weight: 1.5, fillColor: '#2563eb', fillOpacity: 0.05, opacity: 0.5 }
 
 type RegionsLayerProps = {
     active: boolean
+    hoverFill?: boolean
     lockedId?: number | null
     onSelect: (place: Place) => void
 }
 
-export function RegionsLayer({ active, lockedId = null, onSelect }: RegionsLayerProps) {
+export function RegionsLayer({ active, hoverFill = true, lockedId = null, onSelect }: RegionsLayerProps) {
     const [data, setData] = useState<FeatureCollection | null>(null)
     const layerRef = useRef<LeafletGeoJSON | null>(null)
     const activeRef = useRef(active)
     const onSelectRef = useRef(onSelect)
     const lockedRef = useRef(lockedId)
+    const hoverFillRef = useRef(hoverFill)
+    const ignoreClicksUntilRef = useRef(0)
 
     useEffect(() => {
+        if (!activeRef.current && active) ignoreClicksUntilRef.current = Date.now() + 400
         activeRef.current = active
         onSelectRef.current = onSelect
         lockedRef.current = lockedId
-    }, [active, lockedId, onSelect])
+        hoverFillRef.current = hoverFill
+    }, [active, hoverFill, lockedId, onSelect])
 
     useEffect(() => {
         const controller = new AbortController()
@@ -57,17 +63,17 @@ export function RegionsLayer({ active, lockedId = null, onSelect }: RegionsLayer
                         if (!activeRef.current || isLocked()) layer.closeTooltip()
                     },
                     mouseover: () => {
-                        if (activeRef.current && !isLocked()) (layer as Polygon).setStyle(HOVER)
+                        if (activeRef.current && !isLocked()) (layer as Polygon).setStyle(hoverFillRef.current ? HOVER : { ...HOVER, fillOpacity: 0 })
                     },
                     mouseout: () => layerRef.current?.resetStyle(layer),
                     click: () => {
-                        if (!activeRef.current) return
-                        const b = (layer as Polygon).getBounds()
+                        if (!activeRef.current || isLocked() || Date.now() < ignoreClicksUntilRef.current) return
+                        const area = normalizeArea(feature.geometry as GeoPolygon | MultiPolygon)
                         onSelectRef.current({
                             id: Number(feature.id ?? props.id ?? Math.random() * 1e9),
                             name,
-                            bounds: { west: b.getWest(), south: b.getSouth(), east: b.getEast(), north: b.getNorth() },
-                            geometry: feature.geometry,
+                            bounds: area.bounds,
+                            geometry: area.geometry,
                         })
                     },
                 })
