@@ -1,5 +1,7 @@
 import type { LogisticsEdge } from "@/api/types";
 import { MODES, MODE_COLOR, MODE_LABEL } from "@/lib/modes";
+import { useMemo } from "react";
+import { uniqueConnections } from "./uniqueConnections";
 
 const transportTypes = MODES.map((mode) => ({
     mode,
@@ -12,10 +14,15 @@ type TransportStatisticsProps = {
 };
 
 export function TransportStatistics({ edges }: TransportStatisticsProps) {
+    const connections = useMemo(
+        () => uniqueConnections(edges ?? []),
+        [edges]
+    );
+
     const transportStats = transportTypes.map((transport) => {
-        const transportEdges = edges?.filter(
+        const transportEdges = connections.filter(
             (edge) => edge.mode === transport.mode
-        ) ?? [];
+        );
 
         const totalLength = transportEdges.reduce(
             (sum, edge) => sum + edge.distance_km,
@@ -70,8 +77,8 @@ export function TransportStatistics({ edges }: TransportStatisticsProps) {
                                 style={{
                                     backgroundColor: transport.color,
                                     width: `${transportEdgeCount > 0
-                                            ? (transport.edgeCount / transportEdgeCount) * 100
-                                            : 0
+                                        ? (transport.edgeCount / transportEdgeCount) * 100
+                                        : 0
                                         }%`,
                                 }}
                             />

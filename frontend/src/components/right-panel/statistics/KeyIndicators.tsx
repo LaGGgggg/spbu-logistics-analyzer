@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { LogisticsGraph } from "@/api/types";
+import { uniqueConnections } from "./uniqueConnections";
 
 function computeTopology(graph: LogisticsGraph) {
     const pairs = new Set<string>();
@@ -49,13 +50,18 @@ type KeyIndicatorsProps = {
 };
 
 export function KeyIndicators({ graph }: KeyIndicatorsProps) {
+    const connections = useMemo(
+        () => uniqueConnections(graph?.edges ?? []),
+        [graph]
+    );
+
     const totalLength = graph
-        ? graph.edges.reduce((sum, edge) => sum + edge.distance_km, 0)
+        ? connections.reduce((sum, edge) => sum + edge.distance_km, 0)
         : null;
 
     const averageLength =
-        graph && graph.edges.length > 0 && totalLength !== null
-            ? totalLength / graph.edges.length
+        connections.length > 0 && totalLength !== null
+            ? totalLength / connections.length
             : null;
 
     const topology = useMemo(
@@ -88,7 +94,7 @@ export function KeyIndicators({ graph }: KeyIndicatorsProps) {
                     </p>
 
                     <p className="mt-1 font-mono text-lg font-semibold">
-                        {graph ? graph.edges.length.toLocaleString("ru-RU") : "—"}
+                        {graph ? connections.length.toLocaleString("ru-RU") : "—"}
                     </p>
                 </div>
 
