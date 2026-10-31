@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { StatisticsPanel } from "./StatisticsPanel";
+import { StatisticsPanel } from "./statistics/StatisticsPanel";
 import { NodePanel } from "./NodePanel";
 import type { LogisticsGraph } from "@/api/types";
 
