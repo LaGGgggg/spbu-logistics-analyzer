@@ -80,10 +80,18 @@ func (r *cancellableRepository) Fail(context.Context, string, string) error {
 	return nil
 }
 
-func (r *cancellableRepository) Requeue(context.Context, string) error {
+func (r *cancellableRepository) Requeue(_ context.Context, id string) error {
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
+	// The PostgreSQL repository requeues only a processing job. A cancellation
+	// that won the race must therefore stay cancelled even during shutdown.
+	if id != r.job.ID || r.job.Status != logistics_service.Processing {
+		return nil
+	}
+
+	r.job.Status = logistics_service.Pending
 	r.outcome = "requeue"
 
 	return nil
