@@ -4,10 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/domain/logistics"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/migrations"
 )
+
+const backendLockID int64 = 81743021
 
 func (p *Repository) Initialize(ctx context.Context, regions []logistics.Region) (func(), error) {
 
@@ -19,7 +22,7 @@ func (p *Repository) Initialize(ctx context.Context, regions []logistics.Region)
 
 	var locked bool
 
-	if err := conn.QueryRow(ctx, "SELECT pg_try_advisory_lock(81743021)").Scan(&locked); err != nil || !locked {
+	if err := conn.QueryRow(ctx, "SELECT pg_try_advisory_lock($1)", backendLockID).Scan(&locked); err != nil || !locked {
 		conn.Release()
 
 		if err != nil {
@@ -29,10 +32,19 @@ func (p *Repository) Initialize(ctx context.Context, regions []logistics.Region)
 		return nil, fmt.Errorf("another backend instance is already running")
 	}
 
+	var releaseOnce sync.Once
 	release := func() {
+		releaseOnce.Do(func() {
+			// Advisory locks are bound to a PostgreSQL session. Returning a live
+			// connection to the pool without unlocking would leak the lock; closing
+			// it and immediately acquiring a new session introduces a release race.
+			// Unlock explicitly before releasing the pooled connection.
+			if _, unlockErr := conn.Exec(context.Background(), "SELECT pg_advisory_unlock($1)", backendLockID); unlockErr != nil {
+				_ = conn.Conn().Close(context.Background())
+			}
 
-		_ = conn.Conn().Close(context.Background())
-		conn.Release()
+			conn.Release()
+		})
 	}
 
 	tx, err := conn.Begin(ctx)
