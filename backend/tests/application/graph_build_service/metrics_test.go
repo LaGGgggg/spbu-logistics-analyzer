@@ -85,6 +85,11 @@ func TestCalculateMetrics_PathGraph(t *testing.T) {
 		t.Fatalf("node B should have higher PageRank than node A: %+v", g.Metrics.PageRank)
 	}
 
+	// Closeness: B should have higher closeness than A and C
+	if g.Metrics.Closeness["B"] <= g.Metrics.Closeness["A"] || g.Metrics.Closeness["B"] <= g.Metrics.Closeness["C"] {
+		t.Fatalf("node B should have higher closeness than A and C: %+v", g.Metrics.Closeness)
+	}
+
 	// Also verify fields were populated on the nodes themselves
 	for _, node := range g.Nodes {
 		if node.ID == "B" {
@@ -94,6 +99,38 @@ func TestCalculateMetrics_PathGraph(t *testing.T) {
 			if node.Betweenness != 1.0 {
 				t.Fatalf("expected node B Betweenness=1.0, got %v", node.Betweenness)
 			}
+			if node.Closeness <= 0 {
+				t.Fatalf("expected node B Closeness > 0, got %v", node.Closeness)
+			}
 		}
+	}
+}
+
+func TestFilterGraphModes(t *testing.T) {
+	g := logistics.LogisticsGraph{
+		Nodes: []logistics.LogisticsNode{
+			{ID: "n1", Name: "Rail Only", Modes: []logistics.TransportMode{logistics.TransportRail}},
+			{ID: "n2", Name: "Rail and River", Modes: []logistics.TransportMode{logistics.TransportRail, logistics.TransportRiver}},
+			{ID: "n3", Name: "River Only", Modes: []logistics.TransportMode{logistics.TransportRiver}},
+		},
+		Edges: []logistics.LogisticsEdge{
+			{ID: "e1", FromNodeID: "n1", ToNodeID: "n2", Mode: logistics.TransportRail, DistanceKM: 15},
+			{ID: "e2", FromNodeID: "n2", ToNodeID: "n3", Mode: logistics.TransportRiver, DistanceKM: 25},
+		},
+	}
+
+	// Filter rail only
+	railSub := graph_build_service.FilterGraphModes(g, []logistics.TransportMode{logistics.TransportRail})
+	if len(railSub.Nodes) != 2 || len(railSub.Edges) != 1 {
+		t.Fatalf("expected 2 nodes and 1 edge for rail, got %d nodes and %d edges", len(railSub.Nodes), len(railSub.Edges))
+	}
+	if railSub.Edges[0].ID != "e1" {
+		t.Fatalf("expected edge e1, got %s", railSub.Edges[0].ID)
+	}
+
+	// Filter empty modes -> returns full graph
+	fullSub := graph_build_service.FilterGraphModes(g, nil)
+	if len(fullSub.Nodes) != 3 || len(fullSub.Edges) != 2 {
+		t.Fatalf("expected full graph when modes is empty")
 	}
 }

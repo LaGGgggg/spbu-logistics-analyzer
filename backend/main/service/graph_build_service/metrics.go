@@ -27,7 +27,7 @@ func (q *dijkstraQueue) Pop() any {
 	return item
 }
 
-// CalculateMetrics computes PageRank, Betweenness centrality, and Power Load for the graph.
+// CalculateMetrics computes PageRank, Betweenness centrality, Closeness centrality, and Power Load for the graph.
 func CalculateMetrics(g *logistics.LogisticsGraph) {
 	if g == nil {
 		return
@@ -38,6 +38,7 @@ func CalculateMetrics(g *logistics.LogisticsGraph) {
 		g.Metrics = &logistics.GraphMetrics{
 			PageRank:    map[string]float64{},
 			Betweenness: map[string]float64{},
+			Closeness:   map[string]float64{},
 			PowerLoad:   []logistics.NodePowerLoad{},
 		}
 		return
@@ -158,13 +159,15 @@ func CalculateMetrics(g *logistics.LogisticsGraph) {
 		pr[g.Nodes[i].ID] = val
 	}
 
-	// 4. Betweenness Centrality (Brandes' Algorithm)
+	// 4. Betweenness & Closeness Centrality
 	cb := make(map[string]float64, n)
+	cc := make(map[string]float64, n)
 	for _, node := range g.Nodes {
 		cb[node.ID] = 0.0
+		cc[node.ID] = 0.0
 	}
 
-	if n > 2 {
+	if n > 1 {
 		for _, sNode := range g.Nodes {
 			s := sNode.ID
 			stack := make([]string, 0, n)
@@ -208,36 +211,95 @@ func CalculateMetrics(g *logistics.LogisticsGraph) {
 				}
 			}
 
-			delta := make(map[string]float64, n)
-			for i := len(stack) - 1; i >= 0; i-- {
-				w := stack[i]
-				for _, v := range p[w] {
-					if sigma[w] > 0 {
-						delta[v] += (sigma[v] / sigma[w]) * (1.0 + delta[w])
-					}
+			// Closeness Centrality (Wasserman & Faust formula)
+			sumDist := 0.0
+			reached := 0
+			for _, node := range g.Nodes {
+				if node.ID != s && dist[node.ID] < math.Inf(1) {
+					sumDist += dist[node.ID]
+					reached++
 				}
-				if w != s {
-					cb[w] += delta[w]
+			}
+			if reached > 0 && sumDist > 0 {
+				val := (float64(reached) / float64(n-1)) * (float64(reached) / sumDist)
+				cc[s] = math.Round(val*1000000) / 1000000
+			}
+
+			if n > 2 {
+				delta := make(map[string]float64, n)
+				for i := len(stack) - 1; i >= 0; i-- {
+					w := stack[i]
+					for _, v := range p[w] {
+						if sigma[w] > 0 {
+							delta[v] += (sigma[v] / sigma[w]) * (1.0 + delta[w])
+						}
+					}
+					if w != s {
+						cb[w] += delta[w]
+					}
 				}
 			}
 		}
 
-		// Normalize betweenness
-		normFactor := float64((n - 1) * (n - 2))
-		for k := range cb {
-			cb[k] /= normFactor
-			cb[k] = math.Round(cb[k]*100000) / 100000
+		if n > 2 {
+			// Normalize betweenness
+			normFactor := float64((n - 1) * (n - 2))
+			for k := range cb {
+				cb[k] /= normFactor
+				cb[k] = math.Round(cb[k]*100000) / 100000
+			}
 		}
 	}
 
 	for i := range g.Nodes {
-		val := cb[g.Nodes[i].ID]
-		g.Nodes[i].Betweenness = val
+		id := g.Nodes[i].ID
+		g.Nodes[i].Betweenness = cb[id]
+		g.Nodes[i].Closeness = cc[id]
 	}
 
 	g.Metrics = &logistics.GraphMetrics{
 		PageRank:    pr,
 		Betweenness: cb,
+		Closeness:   cc,
 		PowerLoad:   powerLoads,
 	}
+}
+
+// FilterGraphModes creates a copy of the graph containing only nodes and edges that support the given modes.
+// If modes is empty, the graph is returned as is.
+func FilterGraphModes(g logistics.LogisticsGraph, modes []logistics.TransportMode) logistics.LogisticsGraph {
+	if len(modes) == 0 {
+		return g
+	}
+
+	modeSet := make(map[logistics.TransportMode]bool, len(modes))
+	for _, m := range modes {
+		modeSet[m] = true
+	}
+
+	sub := g
+	sub.Nodes = nil
+	sub.Edges = nil
+
+	for _, n := range g.Nodes {
+		for _, m := range n.Modes {
+			if modeSet[m] {
+				sub.Nodes = append(sub.Nodes, n)
+				break
+			}
+		}
+	}
+
+	nodeIDs := make(map[string]bool, len(sub.Nodes))
+	for _, n := range sub.Nodes {
+		nodeIDs[n.ID] = true
+	}
+
+	for _, e := range g.Edges {
+		if modeSet[e.Mode] && nodeIDs[e.FromNodeID] && nodeIDs[e.ToNodeID] {
+			sub.Edges = append(sub.Edges, e)
+		}
+	}
+
+	return sub
 }

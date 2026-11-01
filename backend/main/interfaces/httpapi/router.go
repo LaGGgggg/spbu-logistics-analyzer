@@ -152,9 +152,8 @@ func NewRouter(service logistics_service.Queries) *gin.Engine {
 
 			graph.Nodes = nodes
 			graph.Edges = edges
-		}
-
-		if graph.Metrics == nil {
+			graph_build_service.CalculateMetrics(&graph)
+		} else if graph.Metrics == nil || graph.Metrics.Closeness == nil {
 			graph_build_service.CalculateMetrics(&graph)
 		}
 
@@ -169,7 +168,35 @@ func NewRouter(service logistics_service.Queries) *gin.Engine {
 			return
 		}
 
-		if graph.Metrics == nil {
+		queryModes := c.QueryArray("mode")
+		var selectedModes []logistics.TransportMode
+		for _, raw := range queryModes {
+			for _, part := range strings.Split(raw, ",") {
+				part = strings.TrimSpace(part)
+				if part == "" {
+					continue
+				}
+				m := logistics.TransportMode(part)
+				if !m.Valid() {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "Неизвестный вид транспорта."})
+
+					return
+				}
+				if !slices.Contains(selectedModes, m) {
+					selectedModes = append(selectedModes, m)
+				}
+			}
+		}
+
+		if len(selectedModes) > 0 {
+			subgraph := graph_build_service.FilterGraphModes(graph, selectedModes)
+			graph_build_service.CalculateMetrics(&subgraph)
+			c.JSON(http.StatusOK, subgraph.Metrics)
+
+			return
+		}
+
+		if graph.Metrics == nil || graph.Metrics.Closeness == nil {
 			graph_build_service.CalculateMetrics(&graph)
 		}
 

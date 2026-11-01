@@ -75,6 +75,7 @@ func TestAPIValidationAndExports(t *testing.T) {
 		{"GET", "/api/graphs/g?mode=invalid", "", 400}, {"GET", "/api/graphs/g/export/geojson", "", 200},
 		{"GET", "/api/graphs/g/export/bad", "", 400}, {"GET", "/api/graphs/g/coverage", "", 200},
 		{"GET", "/api/graphs/g/metrics", "", 200}, {"GET", "/api/graphs/missing/metrics", "", 404},
+		{"GET", "/api/graphs/g/metrics?mode=rail", "", 200}, {"GET", "/api/graphs/g/metrics?mode=invalid", "", 400},
 	}
 
 	for _, c := range cases {

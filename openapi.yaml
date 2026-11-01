@@ -276,9 +276,17 @@ paths:
       operationId: getGraphMetrics
       tags: [Graphs]
       summary: Получить вычисленные сетевые метрики графа
-      description: Возвращает PageRank, Betweenness Centrality и Power Load (степень узлов в порядке возрастания).
+      description: Возвращает PageRank, Betweenness Centrality, Closeness Centrality и Power Load (степень узлов в порядке возрастания) с возможностью фильтрации по видам транспорта.
       parameters:
         - $ref: '#/components/parameters/ResourceId'
+        - name: mode
+          in: query
+          required: false
+          description: Фильтр по видам транспорта (rail, sea, river) для расчета метрик. Можно передать один вид, список через запятую (например, mode=rail,river) или повторяющийся параметр (mode=rail&mode=river). При отсутствии или пустом значении учитываются все доступные виды транспорта.
+          allowEmptyValue: true
+          schema:
+            type: string
+            enum: [rail, sea, river, '']
       responses:
         '200':
           description: Метрики графа
@@ -547,6 +555,7 @@ components:
         cargo: {type: string}
         page_rank: {type: number}
         betweenness: {type: number}
+        closeness: {type: number}
         power_load: {type: integer}
         sources:
           type: array
@@ -599,7 +608,7 @@ components:
           $ref: '#/components/schemas/GraphMetrics'
     GraphMetrics:
       type: object
-      required: [page_rank, betweenness, power_load]
+      required: [page_rank, betweenness, closeness, power_load]
       properties:
         page_rank:
           type: object
@@ -611,6 +620,11 @@ components:
           additionalProperties:
             type: number
           description: Нормализованная посредническая центральность (Betweenness Centrality).
+        closeness:
+          type: object
+          additionalProperties:
+            type: number
+          description: Центральность по близости (Closeness Centrality).
         power_load:
           type: array
           items:

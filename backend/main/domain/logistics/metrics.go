@@ -3,6 +3,7 @@ package logistics
 type GraphMetrics struct {
 	PageRank    map[string]float64 `json:"page_rank"`
 	Betweenness map[string]float64 `json:"betweenness"`
+	Closeness   map[string]float64 `json:"closeness"`
 	PowerLoad   []NodePowerLoad    `json:"power_load"`
 }
 
