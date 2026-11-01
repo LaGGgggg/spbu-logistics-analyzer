@@ -11,6 +11,7 @@ type Repository interface {
 	RequestBuild(context.Context, string) (BuildResult, error)
 	RequestAreaBuild(context.Context, logistics.Region) (BuildResult, error)
 	GetJob(context.Context, string) (Job, error)
+	CancelJob(context.Context, string) (Job, error)
 	GetGraph(context.Context, string) (logistics.LogisticsGraph, error)
 	Claim(context.Context) (Job, logistics.Region, error)
 	Complete(context.Context, Job, logistics.LogisticsGraph) error

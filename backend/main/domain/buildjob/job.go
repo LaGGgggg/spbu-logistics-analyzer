@@ -9,6 +9,7 @@ const (
 	Processing Status = "processing"
 	Completed  Status = "completed"
 	Failed     Status = "failed"
+	Cancelled  Status = "cancelled"
 )
 
 type Job struct {

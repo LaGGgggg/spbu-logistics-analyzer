@@ -29,6 +29,20 @@ func (p *Repository) Complete(ctx context.Context, job logistics_service.Job, gr
 		_ = tx.Rollback(context.Background())
 	}()
 
+	var status logistics_service.Status
+
+	if err := tx.QueryRow(ctx, "SELECT status FROM jobs WHERE id=$1 FOR UPDATE", job.ID).Scan(&status); err != nil {
+		return translate(err)
+	}
+
+	if status == logistics_service.Cancelled {
+		return logistics_service.ErrJobCancelled
+	}
+
+	if status != logistics_service.Processing {
+		return logistics_service.ErrJobNotCancellable
+	}
+
 	if graph.Nodes == nil {
 		graph.Nodes = []logistics.LogisticsNode{}
 	}
@@ -54,7 +68,7 @@ func (p *Repository) Complete(ctx context.Context, job logistics_service.Job, gr
 	}
 
 	if changed.RowsAffected() != 1 {
-		return fmt.Errorf("job is no longer processing")
+		return logistics_service.ErrJobNotCancellable
 	}
 
 	return tx.Commit(ctx)

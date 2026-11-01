@@ -117,6 +117,17 @@ func NewRouter(service logistics_service.Queries) *gin.Engine {
 
 		c.JSON(http.StatusOK, job)
 	})
+	router.POST("/api/jobs/:id/cancel", func(c *gin.Context) {
+		job, err := service.CancelJob(c.Request.Context(), c.Param("id"))
+
+		if err != nil {
+			respondError(c, err)
+
+			return
+		}
+
+		c.JSON(http.StatusOK, job)
+	})
 	router.GET("/api/graphs/:id", func(c *gin.Context) {
 		graph, err := service.GetGraph(c.Request.Context(), c.Param("id"))
 
@@ -264,6 +275,12 @@ func respondError(c *gin.Context, err error) {
 
 	if errors.Is(err, logistics_service.ErrNotFound) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Регион, задача или граф не найдены."})
+
+		return
+	}
+
+	if errors.Is(err, logistics_service.ErrJobNotCancellable) {
+		c.JSON(http.StatusConflict, gin.H{"error": "Задача уже завершена и не может быть отменена."})
 
 		return
 	}

@@ -13,8 +13,10 @@ import (
 )
 
 type queries struct {
-	calls   int
-	areaErr error
+	calls       int
+	cancelCalls int
+	areaErr     error
+	cancelErr   error
 }
 
 func (q *queries) Regions(context.Context) ([]logistics.Region, error) {
@@ -41,6 +43,17 @@ func (q *queries) RequestAreaBuild(_ context.Context, b logistics.Bounds) (logis
 
 func (q *queries) GetJob(context.Context, string) (logistics_service.Job, error) {
 	return logistics_service.Job{}, logistics_service.ErrNotFound
+}
+
+func (q *queries) CancelJob(_ context.Context, id string) (logistics_service.Job, error) {
+
+	q.cancelCalls++
+
+	if q.cancelErr != nil {
+		return logistics_service.Job{}, q.cancelErr
+	}
+
+	return logistics_service.Job{ID: id, RegionID: "r", Status: logistics_service.Cancelled}, nil
 }
 
 func (q *queries) GetGraph(_ context.Context, id string) (logistics.LogisticsGraph, error) {
@@ -71,7 +84,7 @@ func TestAPIValidationAndExports(t *testing.T) {
 		{"POST", "/api/graphs", `{"region_id":"r","url":"http://example.com"}`, 400},
 		{"POST", "/api/graphs", `{"region_id":"r"} {}`, 400}, {"POST", "/api/graphs", `{"region_id":" r"}`, 400},
 		{"POST", "/api/graphs", `null`, 400}, {"POST", "/api/graphs", strings.Repeat(" ", 5000), 400},
-		{"GET", "/api/jobs/missing", "", 404}, {"GET", "/api/graphs/missing", "", 404},
+		{"GET", "/api/jobs/missing", "", 404}, {"POST", "/api/jobs/job/cancel", "", 200}, {"GET", "/api/graphs/missing", "", 404},
 		{"GET", "/api/graphs/g?mode=invalid", "", 400}, {"GET", "/api/graphs/g/export/geojson", "", 200},
 		{"GET", "/api/graphs/g/export/bad", "", 400}, {"GET", "/api/graphs/g/coverage", "", 200},
 		{"GET", "/api/graphs/g/metrics", "", 200}, {"GET", "/api/graphs/missing/metrics", "", 404},
@@ -91,11 +104,27 @@ func TestAPIValidationAndExports(t *testing.T) {
 		t.Fatalf("invalid request reached application: %d calls", q.calls)
 	}
 
+	if q.cancelCalls != 1 {
+		t.Fatalf("cancel requests=%d", q.cancelCalls)
+	}
+
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, httptest.NewRequest("GET", "/api/graphs/g?mode=rail", nil))
 
 	if strings.Contains(w.Body.String(), `"id":"port"`) {
 		t.Fatal("mode filter leaked sea node")
+	}
+}
+
+func TestCancelCompletedJobReturns409(t *testing.T) {
+
+	gin.SetMode(gin.TestMode)
+	router := httpapi.NewRouter(&queries{cancelErr: logistics_service.ErrJobNotCancellable})
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest("POST", "/api/jobs/done/cancel", nil))
+
+	if response.Code != 409 {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
 	}
 }
 

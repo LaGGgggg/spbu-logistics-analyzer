@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS graphs (
 CREATE TABLE IF NOT EXISTS jobs (
     id text PRIMARY KEY,
     region_id text NOT NULL REFERENCES regions(id),
-    status text NOT NULL CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
+    status text NOT NULL CHECK (status IN ('pending', 'processing', 'completed', 'failed', 'cancelled')),
     graph_id text REFERENCES graphs(id),
     error text NOT NULL DEFAULT '',
     created_at timestamptz NOT NULL DEFAULT now(),
