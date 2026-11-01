@@ -130,6 +130,8 @@ func (p Service) Build(ctx context.Context, region logistics.Region) (logistics.
 		return g, err
 	}
 
+	CalculateMetrics(&g)
+
 	if err := g.Validate(); err != nil {
 		return g, err
 	}

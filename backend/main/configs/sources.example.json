@@ -8,10 +8,20 @@
       "osm": "../var/extracts/northwestern-fed-district-latest.osm.pbf",
       "url": "https://download.geofabrik.de/russia/northwestern-fed-district-latest.osm.pbf",
       "bounds": {
-        "west": 27.4,
+        "west": 26.8,
         "south": 58.4,
         "east": 35.7,
         "north": 61.4
+      }
+    },
+    "krasnoyarsk-krai": {
+      "osm": "../var/extracts/siberian-fed-district-latest.osm.pbf",
+      "url": "https://download.geofabrik.de/russia/siberian-fed-district-latest.osm.pbf",
+      "bounds": {
+        "west": 80.0,
+        "south": 51.0,
+        "east": 114.0,
+        "north": 82.0
       }
     }
   },

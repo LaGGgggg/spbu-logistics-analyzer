@@ -12,6 +12,7 @@ import (
 
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/domain/logistics"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/interfaces/export"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/service/graph_build_service"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/service/logistics_service"
 	"github.com/gin-gonic/gin"
 )
@@ -151,9 +152,55 @@ func NewRouter(service logistics_service.Queries) *gin.Engine {
 
 			graph.Nodes = nodes
 			graph.Edges = edges
+			graph_build_service.CalculateMetrics(&graph)
+		} else if graph.Metrics == nil || graph.Metrics.Closeness == nil {
+			graph_build_service.CalculateMetrics(&graph)
 		}
 
 		c.JSON(http.StatusOK, graph)
+	})
+	router.GET("/api/graphs/:id/metrics", func(c *gin.Context) {
+		graph, err := service.GetGraph(c.Request.Context(), c.Param("id"))
+
+		if err != nil {
+			respondError(c, err)
+
+			return
+		}
+
+		queryModes := c.QueryArray("mode")
+		var selectedModes []logistics.TransportMode
+		for _, raw := range queryModes {
+			for _, part := range strings.Split(raw, ",") {
+				part = strings.TrimSpace(part)
+				if part == "" {
+					continue
+				}
+				m := logistics.TransportMode(part)
+				if !m.Valid() {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "Неизвестный вид транспорта."})
+
+					return
+				}
+				if !slices.Contains(selectedModes, m) {
+					selectedModes = append(selectedModes, m)
+				}
+			}
+		}
+
+		if len(selectedModes) > 0 {
+			subgraph := graph_build_service.FilterGraphModes(graph, selectedModes)
+			graph_build_service.CalculateMetrics(&subgraph)
+			c.JSON(http.StatusOK, subgraph.Metrics)
+
+			return
+		}
+
+		if graph.Metrics == nil || graph.Metrics.Closeness == nil {
+			graph_build_service.CalculateMetrics(&graph)
+		}
+
+		c.JSON(http.StatusOK, graph.Metrics)
 	})
 	router.GET("/api/graphs/:id/coverage", func(c *gin.Context) {
 		graph, err := service.GetGraph(c.Request.Context(), c.Param("id"))
