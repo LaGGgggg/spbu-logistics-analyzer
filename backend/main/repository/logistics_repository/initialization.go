@@ -48,6 +48,10 @@ func (p *Repository) Initialize(ctx context.Context, regions []logistics.Region)
 	}()
 
 	if _, err = tx.Exec(ctx, migrations.InitialSchema); err == nil {
+		_, err = tx.Exec(ctx, migrations.CancelJobs)
+	}
+
+	if err == nil {
 		for _, region := range regions {
 			var payload []byte
 			payload, err = json.Marshal(region)

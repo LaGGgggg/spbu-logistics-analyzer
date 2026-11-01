@@ -10,8 +10,9 @@ info:
     Ответ 200 на запуск означает, что готовый граф найден в кэше.
 
     Времена передаются в RFC3339, координаты — WGS84 в градусах, длины — в километрах.
-    ID являются непрозрачными строками. Процента готовности, отмены задачи и принудительной
-    пересборки в текущем API нет. Закрытие браузера не отменяет построение.
+    ID являются непрозрачными строками. Процента готовности и принудительной
+    пересборки в текущем API нет. Задачу можно отменить отдельным запросом;
+    закрытие браузера само по себе её не отменяет.
     При остановке backend processing-задача может вернуться в pending.
     Авторизация в текущей реализации отсутствует.
 servers:
@@ -168,7 +169,8 @@ paths:
       summary: Получить состояние задачи
       description: |
         pending — в очереди, processing — выполняется, completed — граф сохранён,
-        failed — построение не удалось. При failed сам запрос статуса возвращает 200.
+        failed — построение не удалось, cancelled — отменена клиентом. При failed
+        или cancelled сам запрос статуса возвращает 200.
         При completed graph_id обязательно присутствует. error — публичное сообщение,
         детали сбоя остаются в серверных логах. Истечение клиентского HTTP-таймаута
         не означает, что серверная задача завершилась ошибкой.
@@ -215,6 +217,45 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/jobs/{id}/cancel:
+    post:
+      operationId: cancelJob
+      tags: [Jobs]
+      summary: Отменить ожидающую или выполняющуюся задачу
+      description: |
+        Переводит pending или processing задачу в cancelled. Для выполняющейся
+        задачи backend отменяет context построителя и не сохраняет частичный
+        либо поздно полученный граф. Повторная отмена cancelled задачи безопасна
+        и возвращает её актуальное состояние. Завершённые (completed, failed)
+        задачи изменить нельзя.
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Задача отменена или уже была отменена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+              example:
+                id: job-example
+                region_id: spb-leningrad
+                status: cancelled
+                created_at: '2026-11-02T12:00:00Z'
+                updated_at: '2026-11-02T12:01:00Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Задача уже завершена и не может быть отменена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example: {error: 'Задача уже завершена и не может быть отменена.'}
         '500':
           $ref: '#/components/responses/InternalError'
   /api/graphs/{id}:
@@ -472,7 +513,7 @@ components:
           $ref: '#/components/schemas/NonEmptyText'
         status:
           type: string
-          enum: [pending, processing, completed, failed]
+          enum: [pending, processing, completed, failed, cancelled]
         graph_id:
           $ref: '#/components/schemas/NonEmptyText'
         error:

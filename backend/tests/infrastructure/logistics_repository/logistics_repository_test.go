@@ -347,4 +347,44 @@ func TestLogisticsRepositoryBuildLifecycle(t *testing.T) {
 	if err != nil || retry.JobID == claimed.ID {
 		t.Fatalf("failure retry=%+v %v", retry, err)
 	}
+
+	cancelled, err := service.CancelJob(ctx, retry.JobID)
+
+	if err != nil || cancelled.Status != logistics_service.Cancelled {
+		t.Fatalf("cancel pending=%+v %v", cancelled, err)
+	}
+
+	cancelledAgain, err := service.CancelJob(ctx, retry.JobID)
+
+	if err != nil || cancelledAgain.Status != logistics_service.Cancelled {
+		t.Fatalf("repeat cancellation=%+v %v", cancelledAgain, err)
+	}
+
+	afterPendingCancel, err := repo.RequestBuild(ctx, "second")
+
+	if err != nil || afterPendingCancel.JobID == "" || afterPendingCancel.JobID == retry.JobID {
+		t.Fatalf("retry after pending cancellation=%+v %v", afterPendingCancel, err)
+	}
+
+	claimed, _, err = repo.Claim(ctx)
+
+	if err != nil || claimed.ID != afterPendingCancel.JobID {
+		t.Fatalf("claim cancellable job=%+v %v", claimed, err)
+	}
+
+	cancelled, err = service.CancelJob(ctx, claimed.ID)
+
+	if err != nil || cancelled.Status != logistics_service.Cancelled {
+		t.Fatalf("cancel processing=%+v %v", cancelled, err)
+	}
+
+	cancelledGraph := logistics.LogisticsGraph{ID: "cancelled-graph", RegionID: "second"}
+
+	if err := repo.Complete(ctx, claimed, cancelledGraph); !errors.Is(err, logistics_service.ErrJobCancelled) {
+		t.Fatalf("complete cancelled job: %v", err)
+	}
+
+	if _, err := repo.GetGraph(ctx, cancelledGraph.ID); !errors.Is(err, logistics_service.ErrNotFound) {
+		t.Fatalf("cancelled job stored graph: %v", err)
+	}
 }

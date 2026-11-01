@@ -11,7 +11,15 @@ type Queries interface {
 	RequestBuild(context.Context, string) (BuildResult, error)
 	RequestAreaBuild(context.Context, logistics.Bounds) (BuildResult, error)
 	GetJob(context.Context, string) (Job, error)
+	CancelJob(context.Context, string) (Job, error)
 	GetGraph(context.Context, string) (logistics.LogisticsGraph, error)
+}
+
+// ActiveBuildCanceller interrupts a graph build that is currently executing in
+// this backend process. Persistent state transitions remain the repository's
+// responsibility, so cancellation is safe even when no worker owns the job.
+type ActiveBuildCanceller interface {
+	CancelBuild(string)
 }
 
 type AreaSource struct {

@@ -18,6 +18,42 @@ type WorkerService struct {
 	Workers      int
 	PollInterval time.Duration
 	BuildTimeout time.Duration
+
+	activeMu sync.Mutex
+	active   map[string]context.CancelFunc
+}
+
+// CancelBuild interrupts an active build in this process. The durable state
+// transition is made first by Service.CancelJob; a missing entry is valid for a
+// queued job and for a job that has just finished.
+func (m *WorkerService) CancelBuild(jobID string) {
+
+	m.activeMu.Lock()
+	cancel := m.active[jobID]
+	m.activeMu.Unlock()
+
+	if cancel != nil {
+		cancel()
+	}
+}
+
+func (m *WorkerService) registerBuild(jobID string, cancel context.CancelFunc) {
+
+	m.activeMu.Lock()
+
+	if m.active == nil {
+		m.active = make(map[string]context.CancelFunc)
+	}
+
+	m.active[jobID] = cancel
+	m.activeMu.Unlock()
+}
+
+func (m *WorkerService) unregisterBuild(jobID string) {
+
+	m.activeMu.Lock()
+	delete(m.active, jobID)
+	m.activeMu.Unlock()
 }
 
 func (m *WorkerService) Run(ctx context.Context) error {
@@ -84,7 +120,26 @@ func (m *WorkerService) execute(ctx context.Context, job Job, region logistics.R
 
 	buildCtx, cancel := context.WithTimeout(ctx, m.BuildTimeout)
 
+	m.registerBuild(job.ID, cancel)
+
+	defer m.unregisterBuild(job.ID)
 	defer cancel()
+
+	// A cancellation may have been committed after Claim and before this worker
+	// registered its context. Re-read the durable state to close that race.
+	current, err := m.Repository.GetJob(buildCtx, job.ID)
+
+	if err != nil {
+		if errors.Is(err, context.Canceled) && ctx.Err() == nil {
+			return nil
+		}
+
+		return fmt.Errorf("check build job %s: %w", job.ID, err)
+	}
+
+	if current.Status != Processing {
+		return nil
+	}
 
 	result, err := safeBuild(buildCtx, m.Builder, region)
 
@@ -106,12 +161,20 @@ func (m *WorkerService) execute(ctx context.Context, job Job, region logistics.R
 
 	if ctx.Err() != nil {
 		err = m.Repository.Requeue(saveCtx, job.ID)
+	} else if errors.Is(buildCtx.Err(), context.Canceled) {
+		// Cancellation from the API has already transitioned the job to
+		// cancelled. In particular, it must not be overwritten with failed.
+		return nil
 	} else if err != nil {
 		slog.Error("build failed", "job_id", job.ID, "error", err)
 		message := "Не удалось построить граф. Проверьте исходные данные и повторите попытку."
 		err = m.Repository.Fail(saveCtx, job.ID, message)
 	} else {
 		err = m.Repository.Complete(saveCtx, job, result)
+	}
+
+	if errors.Is(err, ErrJobCancelled) {
+		return nil
 	}
 
 	if err != nil {

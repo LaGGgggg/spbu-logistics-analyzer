@@ -40,6 +40,10 @@ func (r *outcomeRepository) Claim(ctx context.Context) (logistics_service.Job, l
 	return logistics_service.Job{ID: "job", RegionID: "r"}, logistics.Region{ID: "r"}, nil
 }
 
+func (r *outcomeRepository) GetJob(context.Context, string) (logistics_service.Job, error) {
+	return logistics_service.Job{ID: "job", RegionID: "r", Status: logistics_service.Processing}, nil
+}
+
 func (r *outcomeRepository) persist(ctx context.Context, outcome string) error {
 
 	r.outcome = outcome

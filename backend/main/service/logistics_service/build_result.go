@@ -12,6 +12,7 @@ const (
 	Processing = buildjob.Processing
 	Completed  = buildjob.Completed
 	Failed     = buildjob.Failed
+	Cancelled  = buildjob.Cancelled
 )
 
 type Job = buildjob.Job
