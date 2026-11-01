@@ -8,11 +8,6 @@ import (
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/domain/logistics"
 )
 
-type metricEdge struct {
-	to     string
-	weight float64
-}
-
 type dijkstraItem struct {
 	node string
 	dist float64
