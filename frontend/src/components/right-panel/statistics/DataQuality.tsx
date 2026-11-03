@@ -14,7 +14,7 @@ export function DataQuality({ coverage }: DataQualityProps) {
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
                 <div className="flex justify-between gap-2">
                     <span className="text-muted-foreground">Кандидатов</span>
-                    <span className="font-mono">
+                    <span className="tabular-nums">
                         {coverage
                             ? coverage.candidates.toLocaleString("ru-RU")
                             : "—"}
@@ -23,7 +23,7 @@ export function DataQuality({ coverage }: DataQualityProps) {
 
                 <div className="flex justify-between gap-2">
                     <span className="text-muted-foreground">Принято</span>
-                    <span className="font-mono">
+                    <span className="tabular-nums">
                         {coverage
                             ? coverage.accepted.toLocaleString("ru-RU")
                             : "—"}
@@ -32,7 +32,7 @@ export function DataQuality({ coverage }: DataQualityProps) {
 
                 <div className="flex justify-between gap-2">
                     <span className="text-muted-foreground">Отклонено</span>
-                    <span className="font-mono">
+                    <span className="tabular-nums">
                         {coverage
                             ? coverage.rejected.toLocaleString("ru-RU")
                             : "—"}
@@ -43,7 +43,7 @@ export function DataQuality({ coverage }: DataQualityProps) {
                     <span className="text-muted-foreground">
                         Предупреждений
                     </span>
-                    <span className="font-mono">
+                    <span className="tabular-nums">
                         {coverage
                             ? (coverage.warnings?.length ?? 0).toLocaleString("ru-RU")
                             : "—"}

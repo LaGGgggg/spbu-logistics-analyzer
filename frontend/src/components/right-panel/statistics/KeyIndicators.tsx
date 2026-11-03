@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import type { LogisticsGraph } from "@/api/types";
-import { uniqueConnections } from "./uniqueConnections";
+import { uniqueConnections } from "@/lib/connections";
 
 function computeTopology(graph: LogisticsGraph) {
     const pairs = new Set<string>();
@@ -83,7 +83,7 @@ export function KeyIndicators({ graph }: KeyIndicatorsProps) {
                         Узлов
                     </p>
 
-                    <p className="mt-1 font-mono text-lg font-semibold">
+                    <p className="mt-1 tabular-nums text-lg font-semibold">
                         {graph ? graph.nodes.length.toLocaleString("ru-RU") : "—"}
                     </p>
                 </div>
@@ -93,17 +93,17 @@ export function KeyIndicators({ graph }: KeyIndicatorsProps) {
                         Рёбер
                     </p>
 
-                    <p className="mt-1 font-mono text-lg font-semibold">
+                    <p className="mt-1 tabular-nums text-lg font-semibold">
                         {graph ? connections.length.toLocaleString("ru-RU") : "—"}
                     </p>
                 </div>
 
                 <div className="rounded-md border bg-muted/50 p-3">
                     <p className="text-xs text-muted-foreground">
-                        Сумма длин рёбер
+                        Суммарная длина связей
                     </p>
 
-                    <p className="mt-1 font-mono text-lg font-semibold">
+                    <p className="mt-1 tabular-nums text-lg font-semibold">
                         {totalLength !== null
                             ? totalLength.toLocaleString("ru-RU", {
                                 maximumFractionDigits: 1,
@@ -121,7 +121,7 @@ export function KeyIndicators({ graph }: KeyIndicatorsProps) {
                         Средняя длина ребра
                     </p>
 
-                    <p className="mt-1 font-mono text-lg font-semibold">
+                    <p className="mt-1 tabular-nums text-lg font-semibold">
                         {averageLength !== null
                             ? averageLength.toLocaleString("ru-RU", {
                                 maximumFractionDigits: 1,
@@ -139,7 +139,7 @@ export function KeyIndicators({ graph }: KeyIndicatorsProps) {
                         Плотность графа
                     </p>
 
-                    <p className="mt-1 font-mono text-lg font-semibold">
+                    <p className="mt-1 tabular-nums text-lg font-semibold">
                         {density !== null
                             ? density.toLocaleString("ru-RU", {
                                 maximumFractionDigits: 4,
@@ -153,7 +153,7 @@ export function KeyIndicators({ graph }: KeyIndicatorsProps) {
                         Компонентов связности
                     </p>
 
-                    <p className="mt-1 font-mono text-lg font-semibold">
+                    <p className="mt-1 tabular-nums text-lg font-semibold">
                         {graph ? componentCount.toLocaleString("ru-RU") : "—"}
                     </p>
                 </div>

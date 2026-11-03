@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import type { LogisticsEdge, LogisticsGraph, LogisticsNode } from '@/api/types'
 import { MODE_COLOR, MODE_LABEL } from '@/lib/modes'
 import { kindLabel, UNKNOWN_KIND } from '@/lib/kinds'
-import { computeGraphMetrics, type NodeMetric } from '@/lib/metrics'
+import { formatMetric, METRICS, metricDisplayValue, rankMetrics, type MetricKey, type NodeMetric } from '@/lib/metrics'
 
 type NodePanelProps = {
     graph: LogisticsGraph | null
@@ -26,17 +26,16 @@ const ALWAYS_SHOWN_IDS = ['esr', 'unlocode']
 
 const formatKm = (v: number) => v.toLocaleString('ru-RU', { maximumFractionDigits: 1 })
 const formatCoord = (v: number) => v.toLocaleString('ru-RU', { minimumFractionDigits: 5, maximumFractionDigits: 5 })
-const formatScore = (v: number) => v.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 type MetricRowProps = {
+    metricKey: MetricKey
     label: string
     hint: string
-    metric: NodeMetric | null
+    metric: NodeMetric | undefined
     total: number
-    format?: (metric: NodeMetric) => string
 }
 
-function MetricRow({ label, hint, metric, total, format = (m) => formatScore(m.value) }: MetricRowProps) {
+function MetricRow({ metricKey, label, hint, metric, total }: MetricRowProps) {
     return (
         <div className="flex flex-col gap-1.5">
             <div className="flex items-baseline justify-between gap-2 text-sm">
@@ -45,11 +44,11 @@ function MetricRow({ label, hint, metric, total, format = (m) => formatScore(m.v
                 </span>
                 {metric ? (
                     <span className="tabular-nums">
-                        <span className="font-semibold">{format(metric)}</span>
+                        <span className="font-semibold">{formatMetric(metricKey, metricDisplayValue(metricKey, metric))}</span>
                         <span className="text-muted-foreground"> · {metric.rank} место из {total}</span>
                     </span>
                 ) : (
-                    <span className="text-muted-foreground">граф слишком большой</span>
+                    <span className="text-muted-foreground">нет данных</span>
                 )}
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-muted">
@@ -67,9 +66,8 @@ export function NodePanel({ graph, nodeId, onSelectNode }: NodePanelProps) {
         () => new Map((graph?.nodes ?? []).map((n) => [n.id, n])),
         [graph],
     )
-    const metrics = useMemo(() => (graph ? computeGraphMetrics(graph) : null), [graph])
+    const ranked = useMemo(() => (graph?.metrics ? rankMetrics(graph.metrics) : null), [graph])
     const node = nodeId ? nodesById.get(nodeId) : undefined
-    const nodeMetrics = nodeId ? metrics?.byNode.get(nodeId) : undefined
 
     const neighbors = useMemo(() => {
         if (!graph || !nodeId) return []
@@ -143,37 +141,22 @@ export function NodePanel({ graph, nodeId, onSelectNode }: NodePanelProps) {
                 ))}
             </dl>
 
-            {metrics && nodeMetrics && (
+            {ranked && (
                 <div className="flex flex-col gap-3 border-t pt-4">
                     <div className="flex items-baseline justify-between">
                         <h3 className="text-sm font-semibold">Метрики узла</h3>
                         <span className="text-xs text-muted-foreground">весь граф</span>
                     </div>
-                    <MetricRow
-                        label="Степень"
-                        hint="Сколько узлов связано с этим напрямую"
-                        metric={nodeMetrics.degree}
-                        total={metrics.total}
-                        format={(m) => String(m.raw)}
-                    />
-                    <MetricRow
-                        label="Посредничество"
-                        hint="Как часто узел лежит на кратчайшем пути между другими узлами — транзитная роль"
-                        metric={nodeMetrics.betweenness}
-                        total={metrics.total}
-                    />
-                    <MetricRow
-                        label="Близость"
-                        hint="Насколько близко узел в среднем ко всем остальным по длине путей в км"
-                        metric={nodeMetrics.closeness}
-                        total={metrics.total}
-                    />
-                    <MetricRow
-                        label="PageRank"
-                        hint="Важность узла с учётом важности его соседей"
-                        metric={nodeMetrics.pagerank}
-                        total={metrics.total}
-                    />
+                    {METRICS.map(({ key, label, hint }) => (
+                        <MetricRow
+                            key={key}
+                            metricKey={key}
+                            label={label}
+                            hint={hint}
+                            metric={ranked[key].byNode.get(node.id)}
+                            total={ranked[key].total}
+                        />
+                    ))}
                 </div>
             )}
 

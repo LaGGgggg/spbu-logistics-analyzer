@@ -1,7 +1,7 @@
 import type { LogisticsEdge } from "@/api/types";
 import { MODES, MODE_COLOR, MODE_LABEL } from "@/lib/modes";
 import { useMemo } from "react";
-import { uniqueConnections } from "./uniqueConnections";
+import { uniqueConnections } from "@/lib/connections";
 
 const transportTypes = MODES.map((mode) => ({
     mode,
@@ -61,7 +61,7 @@ export function TransportStatistics({ edges }: TransportStatisticsProps) {
                                 {transport.label}
                             </span>
 
-                            <span className="font-mono text-xs text-muted-foreground">
+                            <span className="tabular-nums text-xs text-muted-foreground">
                                 {edges !== null
                                     ? `${transport.edgeCount.toLocaleString("ru-RU")} · ${transport.totalLength.toLocaleString("ru-RU", {
                                         maximumFractionDigits: 1,

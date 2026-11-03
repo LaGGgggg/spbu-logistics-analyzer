@@ -13,6 +13,7 @@ import { UNKNOWN_KIND } from '@/lib/kinds'
 import type { Place } from '@/api/geocode'
 import { MapResizer } from './MapResizer'
 import { PanToPoint } from './PanToPoint'
+import { uniqueConnections } from '@/lib/connections'
 
 
 
@@ -26,6 +27,7 @@ type MapViewProps = {
     region?: MapRegion | null
     bbox?: BBox | null
     drawMode?: boolean
+    building?: boolean
     onDrawn?: (bbox: BBox) => void
     onDrawCancel?: () => void
     graph?: LogisticsGraph | null
@@ -49,6 +51,7 @@ export function MapView({
     hiddenKinds,
     showEdges = true,
     drawMode = false,
+    building = false,
     onDrawn = () => { },
     onDrawCancel = () => { },
     onSelectPlace = () => { },
@@ -72,11 +75,11 @@ export function MapView({
         if (!graph || !showEdges) return []
 
         const visibleIds = new Set(visibleNodes.map((n) => n.id))
-        return graph.edges.filter((e) =>
+        return uniqueConnections(graph.edges.filter((e) =>
             (!visibleModes || visibleModes.has(e.mode)) &&
             visibleIds.has(e.from_node_id) &&
             visibleIds.has(e.to_node_id),
-        )
+        ))
     }, [graph, showEdges, visibleModes, visibleNodes])
 
 
@@ -86,7 +89,6 @@ export function MapView({
             zoom={DEFAULT_ZOOM}
             className='h-full w-full'
             worldCopyJump
-            attributionControl={false}
         >
             <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -97,7 +99,7 @@ export function MapView({
             <ScaleControl position="bottomleft" imperial={false} />
             <MapResizer />
             <PanToPoint target={focusPoint} />
-            <RegionsLayer active={!drawMode} hoverFill={!graph} lockedId={graph && region ? Number(region.id) : null} onSelect={onSelectPlace} />
+            <RegionsLayer active={!drawMode && !building} hoverFill={!graph} lockedId={graph && region ? Number(region.id) : null} onSelect={onSelectPlace} />
 
 
             <BBoxDrawer active={drawMode} onDrawn={onDrawn} onCancel={onDrawCancel} />

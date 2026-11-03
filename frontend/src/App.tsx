@@ -6,7 +6,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { LayersPanel } from './build/LayersPanel'
 import { MODES } from './lib/modes'
 import type { BBox } from './components/map/BBoxDrawer';
-import { buildGraph, getGraph } from './api/graph';
+import { buildGraph, cancelJob, getGraph } from './api/graph';
 import axios from 'axios';
 import { getApiErrorMessage } from './api/errors';
 import type { Coordinates, LogisticsGraph, TransportMode } from './api/types';
@@ -22,6 +22,7 @@ function App() {
   const [building, setBuilding] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const jobIdRef = useRef<string | null>(null)
   const [visibleModes, setVisibleModes] = useState<Set<TransportMode>>(() => new Set(MODES))
   const [hiddenKinds, setHiddenKinds] = useState<Set<string>>(() => new Set())
   const [showEdges, setShowEdges] = useState(true)
@@ -74,6 +75,7 @@ function App() {
     abortRef.current?.abort()
     const controller = new AbortController()
     abortRef.current = controller
+    jobIdRef.current = null
 
 
     setBuilding(true)
@@ -81,7 +83,7 @@ function App() {
     setSelectedNodeId(null)
 
     try {
-      const graphId = await buildGraph(bbox, controller.signal)
+      const graphId = await buildGraph(bbox, controller.signal, (jobId) => { jobIdRef.current = jobId })
       setGraph(await getGraph(graphId, controller.signal))
     }
     catch (e) {
@@ -93,22 +95,38 @@ function App() {
   }
 
   const handleCancelBuild = useCallback(() => {
+    const jobId = jobIdRef.current
+    jobIdRef.current = null
     abortRef.current?.abort()
     abortRef.current = null
     setBuilding(false)
+    if(!jobId) return
+    cancelJob(jobId).catch((e)=>{
+      if(axios.isAxiosError(e) && e.response?.status===409) return
+      setError(getApiErrorMessage(e))
+    })
   }, [])
 
+  const resetResult = useCallback(() => {
+    handleCancelBuild()
+    setGraph(null)
+    setError(null)
+    setSelectedNodeId(null)
+  }, [handleCancelBuild])
+
   const handleDrawn = useCallback((b: BBox) => {
+    resetResult()
     setBBox(b)
     setRegion(null)
     setDrawMode(false)
-  }, [])
+  }, [resetResult])
   const cancelDraw = useCallback(() => setDrawMode(false), [])
 
   const handleSelectPlace = useCallback((p: Place) => {
+    resetResult()
     setBBox(p.bounds)
     setRegion({ id: String(p.id), name: p.name.split(',')[0], geometry: p.geometry })
-  }, [])
+  }, [resetResult])
 
   const handleSelectNode = useCallback((id: string) => {
     setSelectedNodeId(id)
@@ -136,7 +154,7 @@ function App() {
             building={building}
             error={error}
             onToggleDraw={() => setDrawMode((v) => !v)}
-            onClearBBox={() => { setBBox(null); setRegion(null) }}
+            onClearBBox={() => { resetResult(); setBBox(null); setRegion(null) }}
             onSelectPlace={handleSelectPlace}
             onBuild={handleBuild}
             onCancelBuild={handleCancelBuild}
@@ -170,6 +188,7 @@ function App() {
         graph={graph}
         visibleModes={visibleModes}
         drawMode={drawMode}
+        building={building}
         onDrawn={handleDrawn}
         onDrawCancel={cancelDraw}
         hiddenKinds={hiddenKinds}

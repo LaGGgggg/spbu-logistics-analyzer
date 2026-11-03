@@ -25,6 +25,13 @@ export type LogisticsEdge = {
     directed: boolean
 }
 
+export type GraphMetrics = {
+    page_rank: Record<string, number>
+    betweenness: Record<string, number>
+    closeness: Record<string, number>
+    power_load: {node_id: string; name: string;  degree: number}[]
+}
+
 export type LogisticsGraph = {
     id: string
     region_id: string
@@ -32,6 +39,7 @@ export type LogisticsGraph = {
     nodes: LogisticsNode[]
     edges: LogisticsEdge[]
     coverage: Coverage
+    metrics?: GraphMetrics
 }
 
 export type Coverage = {
@@ -48,7 +56,7 @@ export type Coverage = {
 
 export type Job = {
     id: string
-    status: 'pending' | 'processing' | 'completed' | 'failed'
+    status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled'
     graph_id?: string
     error?: string
 }

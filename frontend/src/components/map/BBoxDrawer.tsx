@@ -17,6 +17,8 @@ type BBoxDrawerProps = {
 
 
 
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
+
 export function BBoxDrawer({ active, onDrawn, onCancel }: BBoxDrawerProps) {
     const map = useMap()
     const [start, setStart] = useState<[number, number] | null>(null)
@@ -39,11 +41,21 @@ export function BBoxDrawer({ active, onDrawn, onCancel }: BBoxDrawerProps) {
 
     useEffect(() => {
         if (!active) return
+        const reset = () => {
+            setStart(null)
+            setCurrent(null)
+        }
         const onKey = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') onCancel()
+            if (e.key !== 'Escape') return
+            reset()
+            onCancel()
         }
         window.addEventListener('keydown', onKey)
-        return () => window.removeEventListener('keydown', onKey)
+        window.addEventListener('mouseup', reset)
+        return () => {
+            window.removeEventListener('keydown', onKey)
+            window.removeEventListener('mouseup', reset)
+        }
     }, [active, onCancel])
 
 
@@ -59,8 +71,10 @@ export function BBoxDrawer({ active, onDrawn, onCancel }: BBoxDrawerProps) {
         },
         mouseup(e: LeafletMouseEvent) {
             if (!active || !start) return
-            const [lat1, lng1] = start
-            const { lat: lat2, lng: lng2 } = e.latlng
+            const lat1 = clamp(start[0], -90, 90)
+            const lng1 = clamp(start[1], -180, 180)
+            const lat2 = clamp(e.latlng.lat, -90, 90)
+            const lng2 = clamp(e.latlng.lng, -180, 180)
             setStart(null)
             setCurrent(null)
 
@@ -74,7 +88,7 @@ export function BBoxDrawer({ active, onDrawn, onCancel }: BBoxDrawerProps) {
         },
     })
 
-    if (!start || !current) return null
+    if (!active || !start || !current) return null
     return (
         <Rectangle
             bounds={[start, current]}

@@ -52,7 +52,7 @@ export function NodeTypeStatistics({ nodes }: NodeTypeStatisticsProps) {
                             />
                         </div>
 
-                        <span className="text-right font-mono text-xs">
+                        <span className="text-right tabular-nums text-xs">
                             {item.count.toLocaleString("ru-RU")}
                         </span>
                     </div>

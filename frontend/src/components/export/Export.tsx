@@ -21,6 +21,7 @@ export function Export({ graphId }: ExportProps) {
     const [isMounted, setIsMounted] = useState(false);
     const [format, setFormat] = useState("nodes.csv");
     const [isDownloading, setIsDownloading] = useState(false);
+    const [downloadError, setDownloadError] = useState<string | null>(null);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -42,11 +43,12 @@ export function Export({ graphId }: ExportProps) {
         if (!graphId || isDownloading) return;
 
         setIsDownloading(true);
+        setDownloadError(null);
 
         try {
             await downloadGraph(graphId, format);
         } catch {
-            alert("Не удалось скачать файл. Попробуйте ещё раз.");
+            setDownloadError("Не удалось скачать файл. Попробуйте ещё раз.");
         } finally {
             setIsDownloading(false);
         }
@@ -108,9 +110,9 @@ export function Export({ graphId }: ExportProps) {
                                     key={item.value}
                                     type="button"
                                     onClick={() => setFormat(item.value)}
-                                    className={`rounded-sm border-2 p-4 text-left ${
+                                    className={`rounded-sm border-2 p-4 text-left transition-colors ${
                                         format === item.value
-                                            ? "border-blue-700"
+                                            ? "border-primary"
                                             : "border-border"
                                     }`}
                                 >
@@ -129,6 +131,12 @@ export function Export({ graphId }: ExportProps) {
                         {!graphId && (
                             <p className="mt-4 text-sm text-muted-foreground">
                                 Для скачивания сначала постройте граф.
+                            </p>
+                        )}
+
+                        {downloadError && (
+                            <p className="mt-4 text-sm text-destructive" role="alert">
+                                {downloadError}
                             </p>
                         )}
 
