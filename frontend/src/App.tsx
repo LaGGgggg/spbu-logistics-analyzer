@@ -1,103 +1,207 @@
-import { useState } from 'react'
 import { MapView, type MapRegion } from '@/components/map/MapView'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
+import { AppLayout } from './components/layout/AppLayout'
+import { Header } from './header/Header'
+import { BuildPanel } from './build/BuildPanel'
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { LayersPanel } from './build/LayersPanel'
+import { MODES } from './lib/modes'
+import type { BBox } from './components/map/BBoxDrawer';
+import { buildGraph, cancelJob, getGraph } from './api/graph';
+import axios from 'axios';
+import { getApiErrorMessage } from './api/errors';
+import type { Coordinates, LogisticsGraph, TransportMode } from './api/types';
+import { UNKNOWN_KIND } from './lib/kinds'
+import { RightPanel, type RightTab } from "@/components/right-panel/RightPanel";
+import type { Place } from './api/geocode';
 
-const TEST_REGION: MapRegion = {
-  id: 'test-len',
-  name: 'Ленинградская область',
-  geometry: {
-    type: 'Polygon',
-    coordinates: [[[27.7, 58.4], [35.7, 58.4], [35.7, 61.4], [27.7, 61.4], [27.7, 58.4]]],
-  } as GeoJSON.Polygon,
-}
 
 function App() {
-  const [query, setQuery] = useState('')
+  const [bbox, setBBox] = useState<BBox | null>(null)
+  const [drawMode, setDrawMode] = useState(false)
+  const [graph, setGraph] = useState<LogisticsGraph | null>(null)
+  const [building, setBuilding] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
+  const jobIdRef = useRef<string | null>(null)
+  const [visibleModes, setVisibleModes] = useState<Set<TransportMode>>(() => new Set(MODES))
+  const [hiddenKinds, setHiddenKinds] = useState<Set<string>>(() => new Set())
+  const [showEdges, setShowEdges] = useState(true)
   const [region, setRegion] = useState<MapRegion | null>(null)
-  const [isLoading/*, setIsLoading*/] = useState(false)
+  const [rightOpen, setRightOpen] = useState(false)
+  const [rightTab, setRightTab] = useState<RightTab>('statistics')
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+  const [focusPoint, setFocusPoint] = useState<Coordinates | null>(null)
 
-  function handleSearch() {
-    const cleanQuery = query.trim()
-    if (cleanQuery === '') {
-      setError('Введите название региона')
-      return
+
+  const toggleMode = useCallback((mode: TransportMode) => {
+    setVisibleModes((prev) => {
+      const next = new Set(prev)
+      if (next.has(mode)) next.delete(mode)
+      else next.add(mode)
+      return next
+    })
+  }, [])
+
+  const toggleKind = useCallback((kind: string) => {
+    setHiddenKinds((prev) => {
+      const next = new Set(prev)
+      if (next.has(kind)) next.delete(kind)
+      else next.add(kind)
+      return next
+    })
+  }, [])
+
+  const kindCounts = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const node of graph?.nodes ?? []) {
+      const kind = node.kind ?? UNKNOWN_KIND
+      counts.set(kind, (counts.get(kind) ?? 0) + 1)
     }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1])
+  }, [graph])
 
+  const modeCounts = useMemo(() => {
+    const counts = { rail: 0, sea: 0, river: 0 } as Record<TransportMode, number>
+    for (const node of graph?.nodes ?? []) {
+      for (const m of node.modes) if (m in counts) counts[m]++
+    }
+    return counts
+  }, [graph])
+
+
+
+  async function handleBuild() {
+    if (!bbox) return
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+    jobIdRef.current = null
+
+
+    setBuilding(true)
     setError(null)
-    setRegion(TEST_REGION)
+    setSelectedNodeId(null)
+
+    try {
+      const graphId = await buildGraph(bbox, controller.signal, (jobId) => { jobIdRef.current = jobId })
+      setGraph(await getGraph(graphId, controller.signal))
+    }
+    catch (e) {
+      if (axios.isCancel(e) || (e instanceof DOMException && e.name === 'AbortError')) return
+      setError(e instanceof Error && !axios.isAxiosError(e) ? e.message : getApiErrorMessage(e))
+    } finally {
+      if (abortRef.current === controller) setBuilding(false)
+    }
   }
 
+  const handleCancelBuild = useCallback(() => {
+    const jobId = jobIdRef.current
+    jobIdRef.current = null
+    abortRef.current?.abort()
+    abortRef.current = null
+    setBuilding(false)
+    if(!jobId) return
+    cancelJob(jobId).catch((e)=>{
+      if(axios.isAxiosError(e) && e.response?.status===409) return
+      setError(getApiErrorMessage(e))
+    })
+  }, [])
+
+  const resetResult = useCallback(() => {
+    handleCancelBuild()
+    setGraph(null)
+    setError(null)
+    setSelectedNodeId(null)
+  }, [handleCancelBuild])
+
+  const handleDrawn = useCallback((b: BBox) => {
+    resetResult()
+    setBBox(b)
+    setRegion(null)
+    setDrawMode(false)
+  }, [resetResult])
+  const cancelDraw = useCallback(() => setDrawMode(false), [])
+
+  const handleSelectPlace = useCallback((p: Place) => {
+    resetResult()
+    setBBox(p.bounds)
+    setRegion({ id: String(p.id), name: p.name.split(',')[0], geometry: p.geometry })
+  }, [resetResult])
+
+  const handleSelectNode = useCallback((id: string) => {
+    setSelectedNodeId(id)
+    setRightTab('node')
+    setRightOpen(true)
+  }, [])
+
+  const handleFocusNode = useCallback((id: string) => {
+    handleSelectNode(id)
+    const node = graph?.nodes.find((n) => n.id === id)
+    if (node) setFocusPoint({ ...node.coordinates })
+  }, [graph, handleSelectNode])
+
   return (
-    <div className="flex h-svh">
-
-      <aside className="dark flex w-80 shrink-0 flex-col border-r bg-background text-foreground">
-        <header className="p-5">
-          <h1 className="text-2xl mb-4">Анализатор логистики</h1>
-          <p className="text-sm text-muted-foreground">
-            Система анализа транспортной инфраструктуры
-          </p>
-        </header>
-
-        <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-5">
-          <form
-            className="space-y-2"
-            onSubmit={(event) => {
-              event.preventDefault()
-              handleSearch()
-            }}
-          >
-            <div className="flex gap-2">
-              <Input
-                id="region-search"
-                className="h-10 rounded-none outline-none"
-                placeholder="Введите регион"
-                value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value)
-                  setError(null)
-                }}
-              />
-              <Button 
-              type="submit" 
-              className="h-10 px-4 rounded-none"
-              disabled={isLoading}
-              >
-                {isLoading ? 'Поиск...' : 'Найти'}
-              </Button>
-            </div>
-            {error && (
-              <p className="text-sm text-destructive" role="alert"> {error}</p>
-            )}
-          </form>
-
-          {region && (
-            <section className="space-y-3 border bg-card p-4">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Выбранный регион
-                </p>
-                <p className="mt-1 font-medium">{region.name}</p>
-              </div>
-              <Button
-                variant="outline"
-                className="h-9 w-full rounded-none"
-                onClick={() => setRegion(null)}
-              >
-                Сбросить
-              </Button>
-            </section>
+    <AppLayout
+      rightOpen={rightOpen}
+      onRightOpenChange={setRightOpen}
+      header={<Header graphId={graph?.id} regionName={region?.name} />}
+      left={
+        <>
+          <BuildPanel
+            bbox={bbox}
+            regionName={region?.name}
+            drawMode={drawMode}
+            building={building}
+            error={error}
+            onToggleDraw={() => setDrawMode((v) => !v)}
+            onClearBBox={() => { resetResult(); setBBox(null); setRegion(null) }}
+            onSelectPlace={handleSelectPlace}
+            onBuild={handleBuild}
+            onCancelBuild={handleCancelBuild}
+          />
+          {graph && (
+            <LayersPanel
+              visibleModes={visibleModes}
+              counts={modeCounts}
+              onToggleMode={toggleMode}
+              kindCounts={kindCounts}
+              hiddenKinds={hiddenKinds}
+              onToggleKind={toggleKind}
+              showEdges={showEdges}
+              onShowEdgesChange={setShowEdges}
+            />
           )}
-        </div>
+        </>
+      }
+      right={
+        <RightPanel
+          graph={graph}
+          activeTab={rightTab}
+          onTabChange={setRightTab}
+          selectedNodeId={selectedNodeId}
+          onSelectNode={handleFocusNode}
+        />
+      }
+    >
+      <MapView
+        bbox={bbox}
+        graph={graph}
+        visibleModes={visibleModes}
+        drawMode={drawMode}
+        building={building}
+        onDrawn={handleDrawn}
+        onDrawCancel={cancelDraw}
+        hiddenKinds={hiddenKinds}
+        showEdges={showEdges}
+        region={region}
+        onSelectPlace={handleSelectPlace}
+        selectedNodeId={selectedNodeId}
+        onSelectNode={handleSelectNode}
+        focusPoint={focusPoint}
+      />
 
 
-      </aside>
-
-      <main className="isolate flex-1">
-        <MapView region={region} />
-      </main>
-    </div>
+    </AppLayout>
   )
 }
 

@@ -12,7 +12,7 @@ export function FitToRegion({geometry}: FitToRegionType) {
     useEffect(()=>{
         const bounds = geoJSON(geometry).getBounds()
         if(bounds.isValid()) {
-            map.fitBounds(bounds, {padding: [24, 24]})
+            map.flyToBounds(bounds, { padding: [24, 24], duration: 0.8 })
         }
     }, [map, geometry])
     return null

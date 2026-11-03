@@ -13,6 +13,11 @@ export function getApiErrorMessage(error: unknown): string {
     return 'Не удалось подключиться к серверу'
   }
 
+  const message = (error.response.data as { error?: unknown } | undefined)?.error
+  if (typeof message === 'string' && message) {
+    return message
+  }
+
   if (error.response.status === 404) {
     return 'Запрашиваемый ресурс не найден'
   }
