@@ -37,7 +37,7 @@ function GraphNode({ node, selected, onSelect }: GraphNodeProps) {
             }}
             eventHandlers={{ click: () => onSelect?.(node.id) }}
         >
-            <Tooltip>
+            <Tooltip pane="tooltipPane">
                 <div className='font-medium'>{node.name}</div>
                 <div className='text-xs'>{node.modes.map((m) => MODE_LABEL[m] ?? m).join(', ')}</div>
             </Tooltip>
