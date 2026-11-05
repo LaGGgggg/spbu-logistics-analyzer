@@ -9,7 +9,7 @@ export const MODE_COLOR: Record<TransportMode, string> = {
 }
 
 export const MODE_LABEL: Record<TransportMode, string> = {
-    rail: 'Ж/д',
+    rail: 'Ж/Д',
     sea: 'Море',
     river: 'Река',
 }
