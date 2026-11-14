@@ -40,8 +40,9 @@ func NewRouter(service logistics_service.Queries) *gin.Engine {
 		decoder := json.NewDecoder(c.Request.Body)
 		decoder.DisallowUnknownFields()
 		var request struct {
-			RegionID *string `json:"region_id"`
-			Bounds   *struct {
+			RegionID     *string `json:"region_id"`
+			Optimization *int    `json:"optimization"`
+			Bounds       *struct {
 				West  *float64 `json:"west"`
 				South *float64 `json:"south"`
 				East  *float64 `json:"east"`
@@ -57,6 +58,12 @@ func NewRouter(service logistics_service.Queries) *gin.Engine {
 
 		if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) || (request.RegionID == nil) == (request.Bounds == nil) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Укажите только region_id или bounds с четырьмя координатами."})
+
+			return
+		}
+
+		if request.Optimization != nil && (*request.Optimization < 0 || *request.Optimization > logistics.MaximumOptimization) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Оптимизация должна быть от 0 до 100."})
 
 			return
 		}
@@ -81,7 +88,7 @@ func NewRouter(service logistics_service.Queries) *gin.Engine {
 				return
 			}
 
-			result, err = service.RequestAreaBuild(c.Request.Context(), bounds)
+			result, err = service.RequestAreaBuild(c.Request.Context(), bounds, request.Optimization)
 		} else {
 			id := *request.RegionID
 

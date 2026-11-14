@@ -29,13 +29,16 @@ type BuildPanelProps = {
     drawMode: boolean
     building: boolean
     error: string | null
+    optimization: number
+    optimizationStale: boolean
+    onOptimizationChange: (value: number) => void
     onToggleDraw: () => void
     onClearBBox: () => void
     onBuild: () => void
     onCancelBuild: () => void
     onSelectPlace: (p: Place) => void
 }
-export function BuildPanel({ bbox, regionName, drawMode, building, error, onToggleDraw, onClearBBox, onBuild, onCancelBuild, onSelectPlace}: BuildPanelProps) {
+export function BuildPanel({ bbox, regionName, drawMode, building, error, optimization, optimizationStale, onOptimizationChange, onToggleDraw, onClearBBox, onBuild, onCancelBuild, onSelectPlace}: BuildPanelProps) {
     const [query, setQuery] = useState('')
     const [places, setPlaces] = useState<Place[]>([])
     const [searching, setSearching] = useState(false)
@@ -142,6 +145,32 @@ export function BuildPanel({ bbox, regionName, drawMode, building, error, onTogg
                     )}
 
                 </div>
+                <div className="flex flex-col gap-2">
+                    <div className="flex items-baseline justify-between">
+                        <span className="text-sm font-medium">Степень оптимизации</span>
+                        <span className="text-sm tabular-nums">{optimization}%</span>
+                    </div>
+                    <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        step={5}
+                        value={optimization}
+                        onChange={(e) => onOptimizationChange(Number(e.target.value))}
+                        className="h-10 w-full accent-primary"
+                        aria-label="Степень оптимизации"
+                        disabled={building}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                        Чем меньше оптимизация, тем больше узлов попадает в граф: 0% — все транспортные объекты, 100% — только подтверждённые грузовые.
+                    </p>
+                    {optimizationStale && (
+                        <p className="text-xs text-primary" role="status">
+                            Уровень изменён — постройте граф заново, чтобы он применился.
+                        </p>
+                    )}
+                </div>
+
                 <div className="flex gap-2">
                     <Button className="h-12 flex-1" disabled={!bbox || building} onClick={onBuild}>
                         {building

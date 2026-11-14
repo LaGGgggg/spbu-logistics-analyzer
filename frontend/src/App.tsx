@@ -9,12 +9,11 @@ import type { BBox } from './components/map/BBoxDrawer';
 import { buildGraph, cancelJob, getGraph } from './api/graph';
 import axios from 'axios';
 import { getApiErrorMessage } from './api/errors';
-import type { Coordinates, LogisticsGraph, TransportMode } from './api/types';
+import type { Coordinates, LogisticsEdge, LogisticsGraph, LogisticsNode, TransportMode } from './api/types';
 import { UNKNOWN_KIND } from './lib/kinds'
+import { computeDisplay } from './lib/display'
 import { RightPanel, type RightTab } from "@/components/right-panel/RightPanel";
 import type { Place } from './api/geocode';
-
-
 function App() {
   const [bbox, setBBox] = useState<BBox | null>(null)
   const [drawMode, setDrawMode] = useState(false)
@@ -26,6 +25,8 @@ function App() {
   const [visibleModes, setVisibleModes] = useState<Set<TransportMode>>(() => new Set(MODES))
   const [hiddenKinds, setHiddenKinds] = useState<Set<string>>(() => new Set())
   const [showEdges, setShowEdges] = useState(true)
+  const [optimization, setOptimization] = useState(0)
+  const [builtOptimization, setBuiltOptimization] = useState<number | null>(null)
   const [region, setRegion] = useState<MapRegion | null>(null)
   const [rightOpen, setRightOpen] = useState(false)
   const [rightTab, setRightTab] = useState<RightTab>('statistics')
@@ -68,6 +69,14 @@ function App() {
     return counts
   }, [graph])
 
+  const display = useMemo(
+    () => graph ? computeDisplay(graph, visibleModes, hiddenKinds, showEdges) : null,
+    [graph, visibleModes, hiddenKinds, showEdges],
+  )
+
+  const displayNodes: LogisticsNode[] = display?.nodes ?? []
+  const displayEdges: LogisticsEdge[] = display?.edges ?? []
+
 
 
   async function handleBuild() {
@@ -81,9 +90,10 @@ function App() {
     setBuilding(true)
     setError(null)
     setSelectedNodeId(null)
+    setBuiltOptimization(optimization)
 
     try {
-      const graphId = await buildGraph(bbox, controller.signal, (jobId) => { jobIdRef.current = jobId })
+      const graphId = await buildGraph(bbox, optimization, controller.signal, (jobId) => { jobIdRef.current = jobId })
       setGraph(await getGraph(graphId, controller.signal))
     }
     catch (e) {
@@ -112,6 +122,7 @@ function App() {
     setGraph(null)
     setError(null)
     setSelectedNodeId(null)
+    setBuiltOptimization(null)
   }, [handleCancelBuild])
 
   const handleDrawn = useCallback((b: BBox) => {
@@ -153,6 +164,9 @@ function App() {
             drawMode={drawMode}
             building={building}
             error={error}
+            optimization={optimization}
+            optimizationStale={graph != null && builtOptimization !== null && optimization !== builtOptimization}
+            onOptimizationChange={setOptimization}
             onToggleDraw={() => setDrawMode((v) => !v)}
             onClearBBox={() => { resetResult(); setBBox(null); setRegion(null) }}
             onSelectPlace={handleSelectPlace}
@@ -186,13 +200,12 @@ function App() {
       <MapView
         bbox={bbox}
         graph={graph}
-        visibleModes={visibleModes}
+        nodes={displayNodes}
+        edges={displayEdges}
         drawMode={drawMode}
         building={building}
         onDrawn={handleDrawn}
         onDrawCancel={cancelDraw}
-        hiddenKinds={hiddenKinds}
-        showEdges={showEdges}
         region={region}
         onSelectPlace={handleSelectPlace}
         selectedNodeId={selectedNodeId}

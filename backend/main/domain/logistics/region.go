@@ -6,6 +6,10 @@ type Region struct {
 	ID            string `json:"id"`
 	Name          string `json:"name"`
 	Bounds        Bounds `json:"bounds"`
+
+	// Optimization overrides the catalog freight policy for this region;
+	// nil keeps the configured default.
+	Optimization *int `json:"optimization,omitempty"`
 }
 
 func (r Region) Validate() error {

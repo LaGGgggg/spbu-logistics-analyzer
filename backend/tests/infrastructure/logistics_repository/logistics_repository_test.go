@@ -203,7 +203,7 @@ func TestLogisticsRepositoryBuildLifecycle(t *testing.T) {
 
 	for range 8 {
 		wg.Go(func() {
-			result, err := areaService.RequestAreaBuild(ctx, areaBounds)
+			result, err := areaService.RequestAreaBuild(ctx, areaBounds, nil)
 
 			if err != nil {
 				areaFailures <- err
@@ -236,7 +236,7 @@ func TestLogisticsRepositoryBuildLifecycle(t *testing.T) {
 	}
 
 	areaBounds.East = 30.2
-	otherArea, err := areaService.RequestAreaBuild(ctx, areaBounds)
+	otherArea, err := areaService.RequestAreaBuild(ctx, areaBounds, nil)
 
 	if err != nil {
 		t.Fatal(err)
@@ -292,7 +292,7 @@ func TestLogisticsRepositoryBuildLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cachedArea, err := areaService.RequestAreaBuild(ctx, areaBounds)
+	cachedArea, err := areaService.RequestAreaBuild(ctx, areaBounds, nil)
 
 	if err != nil || cachedArea.GraphID == "" {
 		t.Fatalf("area cache: %+v %v", cachedArea, err)

@@ -30,7 +30,7 @@ func (q *queries) RequestBuild(context.Context, string) (logistics_service.Build
 	return logistics_service.BuildResult{JobID: "job"}, nil
 }
 
-func (q *queries) RequestAreaBuild(_ context.Context, b logistics.Bounds) (logistics_service.BuildResult, error) {
+func (q *queries) RequestAreaBuild(_ context.Context, b logistics.Bounds, _ *int) (logistics_service.BuildResult, error) {
 
 	q.calls++
 
@@ -75,6 +75,9 @@ func TestAPIValidationAndExports(t *testing.T) {
 		status             int
 	}{
 		{"POST", "/api/graphs", `{"bounds":{"west":29,"south":59,"east":31,"north":61}}`, 202},
+		{"POST", "/api/graphs", `{"bounds":{"west":29,"south":59,"east":31,"north":61},"optimization":0}`, 202},
+		{"POST", "/api/graphs", `{"bounds":{"west":29,"south":59,"east":31,"north":61},"optimization":101}`, 400},
+		{"POST", "/api/graphs", `{"bounds":{"west":29,"south":59,"east":31,"north":61},"optimization":-1}`, 400},
 		{"POST", "/api/graphs", `{"bounds":{"west":31,"south":59,"east":29,"north":61}}`, 400},
 		{"POST", "/api/graphs", `{"bounds":{"west":29,"south":59,"east":31}}`, 400},
 		{"POST", "/api/graphs", `{"bounds":{"west":29,"south":59,"east":31,"north":null}}`, 400},
@@ -100,7 +103,7 @@ func TestAPIValidationAndExports(t *testing.T) {
 		}
 	}
 
-	if q.calls != 2 {
+	if q.calls != 3 {
 		t.Fatalf("invalid request reached application: %d calls", q.calls)
 	}
 

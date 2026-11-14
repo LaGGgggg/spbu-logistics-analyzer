@@ -9,7 +9,7 @@ import (
 type Queries interface {
 	Regions(context.Context) ([]logistics.Region, error)
 	RequestBuild(context.Context, string) (BuildResult, error)
-	RequestAreaBuild(context.Context, logistics.Bounds) (BuildResult, error)
+	RequestAreaBuild(context.Context, logistics.Bounds, *int) (BuildResult, error)
 	GetJob(context.Context, string) (Job, error)
 	CancelJob(context.Context, string) (Job, error)
 	GetGraph(context.Context, string) (logistics.LogisticsGraph, error)
