@@ -13,6 +13,8 @@ import type { Coordinates, LogisticsGraph, TransportMode } from './api/types';
 import { UNKNOWN_KIND } from './lib/kinds'
 import { RightPanel, type RightTab } from "@/components/right-panel/RightPanel";
 import type { Place } from './api/geocode';
+import { getCurrentUser, logout, type AuthUser } from './api/auth';
+import { AuthPage } from './auth/AuthPage';
 
 
 function App() {
@@ -31,6 +33,8 @@ function App() {
   const [rightTab, setRightTab] = useState<RightTab>('statistics')
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [focusPoint, setFocusPoint] = useState<Coordinates | null>(null)
+  const [user, setUser] = useState<AuthUser | null>(() => getCurrentUser())
+  const [authOpen, setAuthOpen] = useState(false)
 
 
   const toggleMode = useCallback((mode: TransportMode) => {
@@ -140,11 +144,23 @@ function App() {
     if (node) setFocusPoint({ ...node.coordinates })
   }, [graph, handleSelectNode])
 
+  const handleAuthSuccess = useCallback((next: AuthUser) => {
+    setUser(next)
+    setAuthOpen(false)
+  }, [])
+
+  const closeAuth = useCallback(() => setAuthOpen(false), [])
+
+  const handleLogout = useCallback(() => {
+    logout().finally(() => setUser(null))
+  }, [])
+
   return (
+    <>
     <AppLayout
       rightOpen={rightOpen}
       onRightOpenChange={setRightOpen}
-      header={<Header graphId={graph?.id} regionName={region?.name} />}
+      header={<Header graphId={graph?.id} regionName={region?.name} user={user} onLogin={() => setAuthOpen(true)} onLogout={handleLogout} />}
       left={
         <>
           <BuildPanel
@@ -202,6 +218,8 @@ function App() {
 
 
     </AppLayout>
+    {authOpen && <AuthPage onSuccess={handleAuthSuccess} onClose={closeAuth} />}
+    </>
   )
 }
 
