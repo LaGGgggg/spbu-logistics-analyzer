@@ -23,6 +23,10 @@ function nodeRadius(weight: number): number {
     return Math.min(BASE_RADIUS * Math.sqrt(weight), MAX_RADIUS)
 }
 
+function nodeOpacity(weight: number): number {
+    return Math.min(0.35 + 0.18 * Math.sqrt(weight - 1), 0.95)
+}
+
 function GraphNode({ node, selected, onSelect }: GraphNodeProps) {
     const ref = useRef<LeafletCircleMarker>(null)
     const weight = Math.max(node.weight ?? 1, 1)
@@ -40,7 +44,7 @@ function GraphNode({ node, selected, onSelect }: GraphNodeProps) {
                 color: '#fff',
                 weight: 1.5,
                 fillColor: MODE_COLOR[node.modes[0]] ?? '#94a3b8',
-                fillOpacity: 0.9,
+                fillOpacity: nodeOpacity(weight),
                 className: 'graph-node',
             }}
             eventHandlers={{ click: () => onSelect?.(node.id) }}

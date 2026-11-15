@@ -25,7 +25,7 @@ function App() {
   const [visibleModes, setVisibleModes] = useState<Set<TransportMode>>(() => new Set(MODES))
   const [hiddenKinds, setHiddenKinds] = useState<Set<string>>(() => new Set())
   const [showEdges, setShowEdges] = useState(true)
-  const [optimization, setOptimization] = useState(0)
+  const [optimization, setOptimization] = useState(100)
   const [builtOptimization, setBuiltOptimization] = useState<number | null>(null)
   const [region, setRegion] = useState<MapRegion | null>(null)
   const [rightOpen, setRightOpen] = useState(false)

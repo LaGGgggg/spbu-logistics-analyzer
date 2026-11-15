@@ -23,6 +23,12 @@ function formatRange(from: number, to: number, positive: string, negative: strin
     return `${deg(from)} ${from >= 0 ? positive : negative} – ${deg(to)} ${to >= 0 ? positive : negative}`
 }
 
+const OPTIMIZATION_PRESETS = [
+    { value: 100, label: 'По умолчанию', hint: 'Только подтверждённые грузовые объекты' },
+    { value: 50, label: 'Средняя', hint: 'Плюс станции и порты без подтверждения грузового профиля' },
+    { value: 0, label: 'Минимальная', hint: 'Все транспортные объекты, включая закрытые и не-грузовые' },
+]
+
 type BuildPanelProps = {
     bbox: BBox | null
     regionName?: string
@@ -146,27 +152,29 @@ export function BuildPanel({ bbox, regionName, drawMode, building, error, optimi
 
                 </div>
                 <div className="flex flex-col gap-2">
-                    <div className="flex items-baseline justify-between">
-                        <span className="text-sm font-medium">Степень оптимизации</span>
-                        <span className="text-sm tabular-nums">{optimization}%</span>
-                    </div>
-                    <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        step={5}
+                    <label htmlFor="optimization-mode" className="text-sm font-medium">
+                        Степень оптимизации
+                    </label>
+                    <select
+                        id="optimization-mode"
                         value={optimization}
                         onChange={(e) => onOptimizationChange(Number(e.target.value))}
-                        className="h-10 w-full accent-primary"
-                        aria-label="Степень оптимизации"
                         disabled={building}
-                    />
+                        className="h-10 w-full rounded-sm border bg-transparent px-2.5 text-sm outline-none transition-colors disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
+                        aria-label="Степень оптимизации"
+                    >
+                        {OPTIMIZATION_PRESETS.map((preset) => (
+                            <option key={preset.value} value={preset.value}>
+                                {preset.label}
+                            </option>
+                        ))}
+                    </select>
                     <p className="text-xs text-muted-foreground">
-                        Чем меньше оптимизация, тем больше узлов попадает в граф: 0% — все транспортные объекты, 100% — только подтверждённые грузовые.
+                        {OPTIMIZATION_PRESETS.find((p) => p.value === optimization)?.hint}
                     </p>
                     {optimizationStale && (
                         <p className="text-xs text-primary" role="status">
-                            Уровень изменён — постройте граф заново, чтобы он применился.
+                            Режим изменён — постройте граф заново, чтобы он применился.
                         </p>
                     )}
                 </div>

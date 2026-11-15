@@ -23,7 +23,7 @@ type FreightPolicy struct {
 }
 
 func DefaultFreightPolicy() FreightPolicy {
-	return FreightPolicy{MaximumSnapKM: 1, Optimization: MaximumOptimization, MaximumNodes: 2000}
+	return FreightPolicy{MaximumSnapKM: 1, Optimization: MaximumOptimization, MaximumNodes: 500}
 }
 
 func (p FreightPolicy) Validate() error {
