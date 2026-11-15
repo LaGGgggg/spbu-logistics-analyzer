@@ -50,7 +50,7 @@ func Write(w io.Writer, g logistics.LogisticsGraph, format string) error {
 
 	switch format {
 	case "nodes.csv":
-		if err := row("id", "name", "region_id", "longitude", "latitude", "modes", "external_ids", "kind", "cargo", "sources"); err != nil {
+		if err := row("id", "name", "region_id", "longitude", "latitude", "modes", "external_ids", "kind", "cargo", "weight", "sources"); err != nil {
 			return err
 		}
 
@@ -63,7 +63,7 @@ func Write(w io.Writer, g logistics.LogisticsGraph, format string) error {
 
 			ids, _ := json.Marshal(n.ExternalIDs)
 
-			if err := row(n.ID, safeCell(n.Name), n.RegionID, number(n.Coordinates.Longitude), number(n.Coordinates.Latitude), strings.Join(modes, ";"), string(ids), n.Kind, safeCell(n.Cargo), safeCell(strings.Join(n.Sources, ";"))); err != nil {
+			if err := row(n.ID, safeCell(n.Name), n.RegionID, number(n.Coordinates.Longitude), number(n.Coordinates.Latitude), strings.Join(modes, ";"), string(ids), n.Kind, safeCell(n.Cargo), strconv.Itoa(n.Weight), safeCell(strings.Join(n.Sources, ";"))); err != nil {
 				return err
 			}
 		}
@@ -256,7 +256,7 @@ func graphML(w io.Writer, g logistics.LogisticsGraph) error {
 	for _, n := range g.Nodes {
 		modes, _ := json.Marshal(n.Modes)
 		ids, _ := json.Marshal(n.ExternalIDs)
-		document.Graph.Nodes = append(document.Graph.Nodes, xmlNode{n.ID, []xmlData{{"name", n.Name}, {"longitude", fmt.Sprint(n.Coordinates.Longitude)}, {"latitude", fmt.Sprint(n.Coordinates.Latitude)}, {"modes", string(modes)}, {"external_ids", string(ids)}}})
+		document.Graph.Nodes = append(document.Graph.Nodes, xmlNode{n.ID, []xmlData{{"name", n.Name}, {"longitude", fmt.Sprint(n.Coordinates.Longitude)}, {"latitude", fmt.Sprint(n.Coordinates.Latitude)}, {"modes", string(modes)}, {"external_ids", string(ids)}, {"weight", fmt.Sprint(n.Weight)}}})
 	}
 
 	for _, e := range g.Edges {

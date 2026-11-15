@@ -12,10 +12,14 @@ type LogisticsNode struct {
 	Coordinates Coordinates     `json:"coordinates"`
 	Modes       []TransportMode `json:"modes"`
 	ExternalIDs []ExternalID    `json:"external_ids"`
-	PageRank    float64         `json:"page_rank,omitempty"`
-	Betweenness float64         `json:"betweenness,omitempty"`
-	Closeness   float64         `json:"closeness,omitempty"`
-	PowerLoad   int             `json:"power_load,omitempty"`
+
+	// Weight counts the original facilities merged into this node by graph
+	// condensation; 1 (omitted) for an ordinary node.
+	Weight      int     `json:"weight,omitempty"`
+	PageRank    float64 `json:"page_rank,omitempty"`
+	Betweenness float64 `json:"betweenness,omitempty"`
+	Closeness   float64 `json:"closeness,omitempty"`
+	PowerLoad   int     `json:"power_load,omitempty"`
 }
 
 func (n LogisticsNode) Validate() error {
@@ -34,6 +38,10 @@ func (n LogisticsNode) Validate() error {
 
 	if len(n.Modes) == 0 {
 		return fmt.Errorf("node must support at least one transport mode")
+	}
+
+	if n.Weight < 1 {
+		return fmt.Errorf("node weight must be positive")
 	}
 
 	modes := make(map[TransportMode]bool, len(n.Modes))

@@ -113,7 +113,7 @@ func (p Service) Build(ctx context.Context, region logistics.Region) (logistics.
 			id = "physical:" + ref.PhysicalID
 		}
 
-		node := logistics.LogisticsNode{ID: id, RegionID: region.ID, Name: ref.Name, Coordinates: *ref.Coordinates, Modes: ref.Modes, ExternalIDs: ref.ExternalIDs, Sources: []string{ref.Source}, Kind: "freight_facility"}
+		node := logistics.LogisticsNode{ID: id, RegionID: region.ID, Name: ref.Name, Coordinates: *ref.Coordinates, Modes: ref.Modes, ExternalIDs: ref.ExternalIDs, Sources: []string{ref.Source}, Kind: "freight_facility", Weight: 1}
 
 		if node.Name == "" {
 			node.Name = id
@@ -135,6 +135,8 @@ func (p Service) Build(ctx context.Context, region logistics.Region) (logistics.
 	if err := connect(ctx, &g, dataset.Tracks, p.Policy.MaximumSnapKM); err != nil {
 		return g, err
 	}
+
+	condense(&g, policy.MaximumNodes)
 
 	CalculateMetrics(&g)
 

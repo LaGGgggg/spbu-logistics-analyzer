@@ -15,15 +15,20 @@ const MaximumOptimization = 100
 type FreightPolicy struct {
 	MaximumSnapKM float64 `json:"maximum_snap_km"`
 	Optimization  int     `json:"optimization"`
+
+	// MaximumNodes caps the graph size: when classification accepts more
+	// facilities, nearby clusters are condensed into single weighted nodes.
+	// Zero disables condensation.
+	MaximumNodes int `json:"maximum_nodes"`
 }
 
 func DefaultFreightPolicy() FreightPolicy {
-	return FreightPolicy{MaximumSnapKM: 1, Optimization: MaximumOptimization}
+	return FreightPolicy{MaximumSnapKM: 1, Optimization: MaximumOptimization, MaximumNodes: 2000}
 }
 
 func (p FreightPolicy) Validate() error {
 
-	if !inRange(p.MaximumSnapKM, 0.001, 10) || !inRange(float64(p.Optimization), 0, MaximumOptimization) {
+	if !inRange(p.MaximumSnapKM, 0.001, 10) || !inRange(float64(p.Optimization), 0, MaximumOptimization) || !inRange(float64(p.MaximumNodes), 0, 1e6) {
 		return fmt.Errorf("invalid freight policy")
 	}
 
@@ -104,7 +109,7 @@ func (p FreightPolicy) Classify(f Feature, references []Reference) (LogisticsNod
 	tier := candidateTier(t)
 
 	ids := FeatureIDs(f)
-	node := LogisticsNode{ID: string(f.ExternalID.Namespace) + ":" + f.ExternalID.Value, Name: t["name"], Coordinates: f.Coordinates, ExternalIDs: ids, Sources: []string{"osm"}}
+	node := LogisticsNode{ID: string(f.ExternalID.Namespace) + ":" + f.ExternalID.Value, Name: t["name"], Coordinates: f.Coordinates, ExternalIDs: ids, Sources: []string{"osm"}, Weight: 1}
 
 	referenceMatched := false
 

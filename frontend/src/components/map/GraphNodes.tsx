@@ -16,8 +16,16 @@ type GraphNodeProps = {
     onSelect?: (id: string) => void
 }
 
+const BASE_RADIUS = 7
+const MAX_RADIUS = 22
+
+function nodeRadius(weight: number): number {
+    return Math.min(BASE_RADIUS * Math.sqrt(weight), MAX_RADIUS)
+}
+
 function GraphNode({ node, selected, onSelect }: GraphNodeProps) {
     const ref = useRef<LeafletCircleMarker>(null)
+    const weight = Math.max(node.weight ?? 1, 1)
 
     useEffect(() => {
         ref.current?.getElement()?.classList.toggle('graph-node-active', selected)
@@ -27,7 +35,7 @@ function GraphNode({ node, selected, onSelect }: GraphNodeProps) {
         <CircleMarker
             ref={ref}
             center={[node.coordinates.latitude, node.coordinates.longitude]}
-            radius={7}
+            radius={nodeRadius(weight)}
             pathOptions={{
                 color: '#fff',
                 weight: 1.5,
@@ -40,6 +48,9 @@ function GraphNode({ node, selected, onSelect }: GraphNodeProps) {
             <Tooltip pane="tooltipPane">
                 <div className='font-medium'>{node.name}</div>
                 <div className='text-xs'>{node.modes.map((m) => MODE_LABEL[m] ?? m).join(', ')}</div>
+                {weight > 1 && (
+                    <div className='text-xs'>Объединяет узлов: {weight}</div>
+                )}
             </Tooltip>
         </CircleMarker>
     )
