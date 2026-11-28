@@ -15,6 +15,7 @@ import (
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/repository/config"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/repository/logistics_repository"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/repository/osm"
+	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/service/auth_service"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/service/graph_build_service"
 	"github.com/LaGGgggg/spbu-logistics-analyzer/backend/main/service/logistics_service"
 )
@@ -75,13 +76,14 @@ func run() error {
 	manager := &logistics_service.WorkerService{Repository: repository, Builder: graph_build_service.Service{Source: source, Policy: catalog.Policy}, Workers: cfg.Workers, PollInterval: time.Second, BuildTimeout: cfg.BuildTimeout}
 	service := logistics_service.NewService(repository, source)
 	service.SetActiveBuildCanceller(manager)
+	auth := auth_service.NewService(repository)
 	workerDone := make(chan error, 1)
 
 	go func() {
 		workerDone <- manager.Run(ctx)
 	}()
 
-	server := &http.Server{Addr: cfg.HTTPAddr, Handler: httpapi.NewRouter(service), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: time.Minute}
+	server := &http.Server{Addr: cfg.HTTPAddr, Handler: httpapi.NewRouter(service, auth, httpapi.AuthOptions{SecureCookies: cfg.SecureCookies, CookieDomain: cfg.CookieDomain}), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: time.Minute}
 	serverDone := make(chan error, 1)
 
 	go func() {

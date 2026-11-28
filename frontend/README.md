@@ -1,75 +1,42 @@
-# React + TypeScript + Vite
+# Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Интерфейс сервиса «Магистраль»: карта, построение графа, статистика, метрики, карточка узла, экспорт и вход в аккаунт. Общее описание проекта и запуск всего сервиса — в [корневом README](../README.md).
 
-Currently, two official plugins are available:
+## Стек
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+React 19, TypeScript, Vite, Tailwind CSS 4, shadcn/ui на Base UI, Leaflet и react-leaflet, axios.
 
-## React Compiler
+## Команды
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+npm ci          # установка зависимостей
+npm run dev     # режим разработки на http://127.0.0.1:5173
+npm run lint    # ESLint
+npm run build   # проверка типов и сборка в dist/
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+В режиме разработки запросы `/api` проксируются на backend `http://127.0.0.1:8080` (см. `vite.config.ts`), поэтому backend нужно запустить отдельно.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Структура `src/`
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+| Папка | Содержимое |
+|---|---|
+| `api/` | Клиент API: построение графа с опросом задания, отмена, метрики, экспорт, поиск региона через Nominatim, авторизация |
+| `auth/` | Экран входа и регистрации, подтверждение выхода |
+| `build/` | Левая панель: выбор области и построение, слои |
+| `components/map/` | Карта: регионы, выделение области, узлы и рёбра графа |
+| `components/right-panel/` | Правая панель: статистика, метрики, карточка узла |
+| `components/export/` | Окно экспорта |
+| `components/ui/` | Базовые компоненты интерфейса |
+| `header/` | Шапка, логотип, меню пользователя |
+| `lib/` | Метрики и рейтинги, работа с геометрией, справочники видов транспорта и типов узлов |
 
-```
+## Валидация ввода
+
+- Вход и регистрация: формат email и длина пароля не менее 8 символов, ошибки показываются у полей.
+- Поиск региона: пустой запрос не отправляется.
+- Выделение области: слишком маленькая рамка не принимается, координаты ограничены допустимыми границами.
+
+## Авторизация
+
+Вход, регистрация и выход вынесены в `src/api/auth.ts` и обращаются к backend (`/api/auth/*`). Сессия хранится в HttpOnly cookie, которую устанавливает сервер, поэтому интерфейс не держит токен и узнаёт пользователя через `GET /api/auth/me` при загрузке. Запуск построения и отмена задачи требуют входа; при ответе 401 открывается экран входа.

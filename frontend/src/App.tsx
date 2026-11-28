@@ -2,7 +2,7 @@ import { MapView, type MapRegion } from '@/components/map/MapView'
 import { AppLayout } from './components/layout/AppLayout'
 import { Header } from './header/Header'
 import { BuildPanel } from './build/BuildPanel'
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LayersPanel } from './build/LayersPanel'
 import { MODES } from './lib/modes'
 import type { BBox } from './components/map/BBoxDrawer';
@@ -14,6 +14,14 @@ import { UNKNOWN_KIND } from './lib/kinds'
 import { computeDisplay } from './lib/display'
 import { RightPanel, type RightTab } from "@/components/right-panel/RightPanel";
 import type { Place } from './api/geocode';
+import { getCurrentUser, logout, type AuthUser } from './api/auth';
+import { AuthPage } from './auth/AuthPage';
+import { LogoutDialog } from './auth/LogoutDialog'
+
+function isUnauthorized(e: unknown): boolean {
+  return axios.isAxiosError(e) && e.response?.status === 401
+}
+
 function App() {
   const [bbox, setBBox] = useState<BBox | null>(null)
   const [drawMode, setDrawMode] = useState(false)
@@ -32,6 +40,19 @@ function App() {
   const [rightTab, setRightTab] = useState<RightTab>('statistics')
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [focusPoint, setFocusPoint] = useState<Coordinates | null>(null)
+  const [user, setUser] = useState<AuthUser | null>(null)
+  const [authOpen, setAuthOpen] = useState(false)
+  const [logoutOpen, setLogoutOpen] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+
+    getCurrentUser()
+      .then((current) => { if (!cancelled) setUser(current) })
+      .catch(() => { if (!cancelled) setUser(null) })
+
+    return () => { cancelled = true }
+  }, [])
 
 
   const toggleMode = useCallback((mode: TransportMode) => {
@@ -98,6 +119,10 @@ function App() {
     }
     catch (e) {
       if (axios.isCancel(e) || (e instanceof DOMException && e.name === 'AbortError')) return
+      if (isUnauthorized(e)) {
+        setUser(null)
+        setAuthOpen(true)
+      }
       setError(e instanceof Error && !axios.isAxiosError(e) ? e.message : getApiErrorMessage(e))
     } finally {
       if (abortRef.current === controller) setBuilding(false)
@@ -110,9 +135,9 @@ function App() {
     abortRef.current?.abort()
     abortRef.current = null
     setBuilding(false)
-    if(!jobId) return
-    cancelJob(jobId).catch((e)=>{
-      if(axios.isAxiosError(e) && e.response?.status===409) return
+    if (!jobId) return
+    cancelJob(jobId).catch((e) => {
+      if (axios.isAxiosError(e) && e.response?.status === 409) return
       setError(getApiErrorMessage(e))
     })
   }, [])
@@ -151,70 +176,91 @@ function App() {
     if (node) setFocusPoint({ ...node.coordinates })
   }, [graph, handleSelectNode])
 
-  return (
-    <AppLayout
-      rightOpen={rightOpen}
-      onRightOpenChange={setRightOpen}
-      header={<Header graphId={graph?.id} regionName={region?.name} />}
-      left={
-        <>
-          <BuildPanel
-            bbox={bbox}
-            regionName={region?.name}
-            drawMode={drawMode}
-            building={building}
-            error={error}
-            optimization={optimization}
-            optimizationStale={graph != null && builtOptimization !== null && optimization !== builtOptimization}
-            onOptimizationChange={setOptimization}
-            onToggleDraw={() => setDrawMode((v) => !v)}
-            onClearBBox={() => { resetResult(); setBBox(null); setRegion(null) }}
-            onSelectPlace={handleSelectPlace}
-            onBuild={handleBuild}
-            onCancelBuild={handleCancelBuild}
-          />
-          {graph && (
-            <LayersPanel
-              visibleModes={visibleModes}
-              counts={modeCounts}
-              onToggleMode={toggleMode}
-              kindCounts={kindCounts}
-              hiddenKinds={hiddenKinds}
-              onToggleKind={toggleKind}
-              showEdges={showEdges}
-              onShowEdgesChange={setShowEdges}
+  const handleAuthSuccess = useCallback((next: AuthUser) => {
+    setUser(next)
+    setAuthOpen(false)
+  }, [])
+
+  const closeAuth = useCallback(() => setAuthOpen(false), [])
+
+  const handleLogout = useCallback(() => {
+    logout().finally(() => setUser(null))
+  }, [])
+
+  return (    <>
+      <AppLayout
+        rightOpen={rightOpen}
+        onRightOpenChange={setRightOpen}
+        header={<Header graphId={graph?.id} regionName={region?.name} user={user} onLogin={() => setAuthOpen(true)} onLogout={() => setLogoutOpen(true)} />}
+        left={
+          <>
+            <BuildPanel
+              bbox={bbox}
+              regionName={region?.name}
+              drawMode={drawMode}
+              building={building}
+              error={error}
+              optimization={optimization}
+              optimizationStale={graph != null && builtOptimization !== null && optimization !== builtOptimization}
+              onOptimizationChange={setOptimization}
+              onToggleDraw={() => setDrawMode((v) => !v)}
+              onClearBBox={() => { resetResult(); setBBox(null); setRegion(null) }}
+              onSelectPlace={handleSelectPlace}
+              onBuild={handleBuild}
+              onCancelBuild={handleCancelBuild}
             />
-          )}
-        </>
-      }
-      right={
-        <RightPanel
+            {graph && (
+              <LayersPanel
+                visibleModes={visibleModes}
+                counts={modeCounts}
+                onToggleMode={toggleMode}
+                kindCounts={kindCounts}
+                hiddenKinds={hiddenKinds}
+                onToggleKind={toggleKind}
+                showEdges={showEdges}
+                onShowEdgesChange={setShowEdges}
+              />
+            )}
+          </>
+        }
+        right={
+          <RightPanel
+            graph={graph}
+            activeTab={rightTab}
+            onTabChange={setRightTab}
+            selectedNodeId={selectedNodeId}
+            onSelectNode={handleFocusNode}
+          />
+        }
+      >
+        <MapView
+          bbox={bbox}
           graph={graph}
-          activeTab={rightTab}
-          onTabChange={setRightTab}
+          nodes={displayNodes}
+          edges={displayEdges}
+          drawMode={drawMode}
+          building={building}
+          onDrawn={handleDrawn}
+          onDrawCancel={cancelDraw}
+          region={region}
+          onSelectPlace={handleSelectPlace}
           selectedNodeId={selectedNodeId}
-          onSelectNode={handleFocusNode}
+          onSelectNode={handleSelectNode}
+          focusPoint={focusPoint}
         />
-      }
-    >
-      <MapView
-        bbox={bbox}
-        graph={graph}
-        nodes={displayNodes}
-        edges={displayEdges}
-        drawMode={drawMode}
-        building={building}
-        onDrawn={handleDrawn}
-        onDrawCancel={cancelDraw}
-        region={region}
-        onSelectPlace={handleSelectPlace}
-        selectedNodeId={selectedNodeId}
-        onSelectNode={handleSelectNode}
-        focusPoint={focusPoint}
+
+
+      </AppLayout>
+      {authOpen && <AuthPage onSuccess={handleAuthSuccess} onClose={closeAuth} />}
+      <LogoutDialog
+        open={logoutOpen}
+        onClose={() => setLogoutOpen(false)}
+        onConfirm={() => {
+          setLogoutOpen(false)
+          handleLogout()
+        }}
       />
-
-
-    </AppLayout>
+    </>
   )
 }
 

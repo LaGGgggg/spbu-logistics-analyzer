@@ -17,10 +17,24 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewRouter(service logistics_service.Queries) *gin.Engine {
+func NewRouter(service logistics_service.Queries, auth AuthQueries, options AuthOptions) *gin.Engine {
 
 	router := gin.New()
 	router.Use(gin.Logger(), gin.Recovery())
+
+	registerAuthRoutes(router, auth, options)
+
+	requireAuth := func(c *gin.Context) {
+		if _, err := auth.Current(c.Request.Context(), sessionID(c)); err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация."})
+			c.Abort()
+
+			return
+		}
+
+		c.Next()
+	}
+
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "healthy", "service": "Logistics Network API"})
 	})
@@ -35,7 +49,7 @@ func NewRouter(service logistics_service.Queries) *gin.Engine {
 
 		c.JSON(http.StatusOK, regions)
 	})
-	router.POST("/api/graphs", func(c *gin.Context) {
+	router.POST("/api/graphs", requireAuth, func(c *gin.Context) {
 		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 4096)
 		decoder := json.NewDecoder(c.Request.Body)
 		decoder.DisallowUnknownFields()
@@ -124,7 +138,7 @@ func NewRouter(service logistics_service.Queries) *gin.Engine {
 
 		c.JSON(http.StatusOK, job)
 	})
-	router.POST("/api/jobs/:id/cancel", func(c *gin.Context) {
+	router.POST("/api/jobs/:id/cancel", requireAuth, func(c *gin.Context) {
 		job, err := service.CancelJob(c.Request.Context(), c.Param("id"))
 
 		if err != nil {

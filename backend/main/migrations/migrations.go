@@ -7,3 +7,6 @@ var InitialSchema string
 
 //go:embed 002_cancel_jobs.sql
 var CancelJobs string
+
+//go:embed 003_users.sql
+var Users string
