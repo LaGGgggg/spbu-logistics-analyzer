@@ -117,6 +117,13 @@ export function NodePanel({ graph, nodeId, onSelectNode }: NodePanelProps) {
                 <dt className="text-muted-foreground">Долгота</dt>
                 <dd className="tabular-nums">{formatCoord(node.coordinates.longitude)}</dd>
 
+                {(node.weight ?? 1) > 1 && (
+                    <>
+                        <dt className="text-muted-foreground">Объединяет узлов</dt>
+                        <dd className="tabular-nums">{node.weight}</dd>
+                    </>
+                )}
+
                 {node.cargo && (
                     <>
                         <dt className="text-muted-foreground">Груз</dt>

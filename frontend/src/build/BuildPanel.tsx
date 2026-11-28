@@ -23,19 +23,28 @@ function formatRange(from: number, to: number, positive: string, negative: strin
     return `${deg(from)} ${from >= 0 ? positive : negative} – ${deg(to)} ${to >= 0 ? positive : negative}`
 }
 
+const OPTIMIZATION_PRESETS = [
+    { value: 100, label: 'По умолчанию', hint: 'Только подтверждённые грузовые объекты' },
+    { value: 50, label: 'Средняя', hint: 'Плюс станции и порты без подтверждения грузового профиля' },
+    { value: 0, label: 'Минимальная', hint: 'Все транспортные объекты, включая закрытые и не-грузовые' },
+]
+
 type BuildPanelProps = {
     bbox: BBox | null
     regionName?: string
     drawMode: boolean
     building: boolean
     error: string | null
+    optimization: number
+    optimizationStale: boolean
+    onOptimizationChange: (value: number) => void
     onToggleDraw: () => void
     onClearBBox: () => void
     onBuild: () => void
     onCancelBuild: () => void
     onSelectPlace: (p: Place) => void
 }
-export function BuildPanel({ bbox, regionName, drawMode, building, error, onToggleDraw, onClearBBox, onBuild, onCancelBuild, onSelectPlace}: BuildPanelProps) {
+export function BuildPanel({ bbox, regionName, drawMode, building, error, optimization, optimizationStale, onOptimizationChange, onToggleDraw, onClearBBox, onBuild, onCancelBuild, onSelectPlace}: BuildPanelProps) {
     const [query, setQuery] = useState('')
     const [places, setPlaces] = useState<Place[]>([])
     const [searching, setSearching] = useState(false)
@@ -142,6 +151,34 @@ export function BuildPanel({ bbox, regionName, drawMode, building, error, onTogg
                     )}
 
                 </div>
+                <div className="flex flex-col gap-2">
+                    <label htmlFor="optimization-mode" className="text-sm font-medium">
+                        Степень оптимизации
+                    </label>
+                    <select
+                        id="optimization-mode"
+                        value={optimization}
+                        onChange={(e) => onOptimizationChange(Number(e.target.value))}
+                        disabled={building}
+                        className="h-10 w-full rounded-sm border bg-transparent px-2.5 text-sm outline-none transition-colors disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
+                        aria-label="Степень оптимизации"
+                    >
+                        {OPTIMIZATION_PRESETS.map((preset) => (
+                            <option key={preset.value} value={preset.value}>
+                                {preset.label}
+                            </option>
+                        ))}
+                    </select>
+                    <p className="text-xs text-muted-foreground">
+                        {OPTIMIZATION_PRESETS.find((p) => p.value === optimization)?.hint}
+                    </p>
+                    {optimizationStale && (
+                        <p className="text-xs text-primary" role="status">
+                            Режим изменён — постройте граф заново, чтобы он применился.
+                        </p>
+                    )}
+                </div>
+
                 <div className="flex gap-2">
                     <Button className="h-12 flex-1" disabled={!bbox || building} onClick={onBuild}>
                         {building

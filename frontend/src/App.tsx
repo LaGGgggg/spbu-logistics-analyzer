@@ -2,21 +2,25 @@ import { MapView, type MapRegion } from '@/components/map/MapView'
 import { AppLayout } from './components/layout/AppLayout'
 import { Header } from './header/Header'
 import { BuildPanel } from './build/BuildPanel'
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LayersPanel } from './build/LayersPanel'
 import { MODES } from './lib/modes'
 import type { BBox } from './components/map/BBoxDrawer';
 import { buildGraph, cancelJob, getGraph } from './api/graph';
 import axios from 'axios';
 import { getApiErrorMessage } from './api/errors';
-import type { Coordinates, LogisticsGraph, TransportMode } from './api/types';
+import type { Coordinates, LogisticsEdge, LogisticsGraph, LogisticsNode, TransportMode } from './api/types';
 import { UNKNOWN_KIND } from './lib/kinds'
+import { computeDisplay } from './lib/display'
 import { RightPanel, type RightTab } from "@/components/right-panel/RightPanel";
 import type { Place } from './api/geocode';
 import { getCurrentUser, logout, type AuthUser } from './api/auth';
 import { AuthPage } from './auth/AuthPage';
 import { LogoutDialog } from './auth/LogoutDialog'
 
+function isUnauthorized(e: unknown): boolean {
+  return axios.isAxiosError(e) && e.response?.status === 401
+}
 
 function App() {
   const [bbox, setBBox] = useState<BBox | null>(null)
@@ -29,14 +33,26 @@ function App() {
   const [visibleModes, setVisibleModes] = useState<Set<TransportMode>>(() => new Set(MODES))
   const [hiddenKinds, setHiddenKinds] = useState<Set<string>>(() => new Set())
   const [showEdges, setShowEdges] = useState(true)
+  const [optimization, setOptimization] = useState(100)
+  const [builtOptimization, setBuiltOptimization] = useState<number | null>(null)
   const [region, setRegion] = useState<MapRegion | null>(null)
   const [rightOpen, setRightOpen] = useState(false)
   const [rightTab, setRightTab] = useState<RightTab>('statistics')
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [focusPoint, setFocusPoint] = useState<Coordinates | null>(null)
-  const [user, setUser] = useState<AuthUser | null>(() => getCurrentUser())
+  const [user, setUser] = useState<AuthUser | null>(null)
   const [authOpen, setAuthOpen] = useState(false)
   const [logoutOpen, setLogoutOpen] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+
+    getCurrentUser()
+      .then((current) => { if (!cancelled) setUser(current) })
+      .catch(() => { if (!cancelled) setUser(null) })
+
+    return () => { cancelled = true }
+  }, [])
 
 
   const toggleMode = useCallback((mode: TransportMode) => {
@@ -74,6 +90,14 @@ function App() {
     return counts
   }, [graph])
 
+  const display = useMemo(
+    () => graph ? computeDisplay(graph, visibleModes, hiddenKinds, showEdges) : null,
+    [graph, visibleModes, hiddenKinds, showEdges],
+  )
+
+  const displayNodes: LogisticsNode[] = display?.nodes ?? []
+  const displayEdges: LogisticsEdge[] = display?.edges ?? []
+
 
 
   async function handleBuild() {
@@ -87,13 +111,18 @@ function App() {
     setBuilding(true)
     setError(null)
     setSelectedNodeId(null)
+    setBuiltOptimization(optimization)
 
     try {
-      const graphId = await buildGraph(bbox, controller.signal, (jobId) => { jobIdRef.current = jobId })
+      const graphId = await buildGraph(bbox, optimization, controller.signal, (jobId) => { jobIdRef.current = jobId })
       setGraph(await getGraph(graphId, controller.signal))
     }
     catch (e) {
       if (axios.isCancel(e) || (e instanceof DOMException && e.name === 'AbortError')) return
+      if (isUnauthorized(e)) {
+        setUser(null)
+        setAuthOpen(true)
+      }
       setError(e instanceof Error && !axios.isAxiosError(e) ? e.message : getApiErrorMessage(e))
     } finally {
       if (abortRef.current === controller) setBuilding(false)
@@ -118,6 +147,7 @@ function App() {
     setGraph(null)
     setError(null)
     setSelectedNodeId(null)
+    setBuiltOptimization(null)
   }, [handleCancelBuild])
 
   const handleDrawn = useCallback((b: BBox) => {
@@ -157,8 +187,7 @@ function App() {
     logout().finally(() => setUser(null))
   }, [])
 
-  return (
-    <>
+  return (    <>
       <AppLayout
         rightOpen={rightOpen}
         onRightOpenChange={setRightOpen}
@@ -171,6 +200,9 @@ function App() {
               drawMode={drawMode}
               building={building}
               error={error}
+              optimization={optimization}
+              optimizationStale={graph != null && builtOptimization !== null && optimization !== builtOptimization}
+              onOptimizationChange={setOptimization}
               onToggleDraw={() => setDrawMode((v) => !v)}
               onClearBBox={() => { resetResult(); setBBox(null); setRegion(null) }}
               onSelectPlace={handleSelectPlace}
@@ -204,13 +236,12 @@ function App() {
         <MapView
           bbox={bbox}
           graph={graph}
-          visibleModes={visibleModes}
+          nodes={displayNodes}
+          edges={displayEdges}
           drawMode={drawMode}
           building={building}
           onDrawn={handleDrawn}
           onDrawCancel={cancelDraw}
-          hiddenKinds={hiddenKinds}
-          showEdges={showEdges}
           region={region}
           onSelectPlace={handleSelectPlace}
           selectedNodeId={selectedNodeId}

@@ -20,12 +20,18 @@ func (p Service) Build(ctx context.Context, region logistics.Region) (logistics.
 		return logistics.LogisticsGraph{}, err
 	}
 
-	if err := p.Policy.Validate(); err != nil {
-		return logistics.LogisticsGraph{}, err
-	}
-
 	if p.Source == nil {
 		return logistics.LogisticsGraph{}, fmt.Errorf("no dataset source configured")
+	}
+
+	policy := p.Policy
+
+	if region.Optimization != nil {
+		policy.Optimization = *region.Optimization
+	}
+
+	if err := policy.Validate(); err != nil {
+		return logistics.LogisticsGraph{}, err
 	}
 
 	dataset, err := p.Source.Load(ctx, region)
@@ -48,7 +54,7 @@ func (p Service) Build(ctx context.Context, region logistics.Region) (logistics.
 		}
 
 		g.Coverage.Candidates++
-		node, ok := p.Policy.Classify(f, dataset.References)
+		node, ok := policy.Classify(f, dataset.References)
 
 		if !ok {
 			g.Coverage.Rejected++
@@ -107,7 +113,7 @@ func (p Service) Build(ctx context.Context, region logistics.Region) (logistics.
 			id = "physical:" + ref.PhysicalID
 		}
 
-		node := logistics.LogisticsNode{ID: id, RegionID: region.ID, Name: ref.Name, Coordinates: *ref.Coordinates, Modes: ref.Modes, ExternalIDs: ref.ExternalIDs, Sources: []string{ref.Source}, Kind: "freight_facility"}
+		node := logistics.LogisticsNode{ID: id, RegionID: region.ID, Name: ref.Name, Coordinates: *ref.Coordinates, Modes: ref.Modes, ExternalIDs: ref.ExternalIDs, Sources: []string{ref.Source}, Kind: "freight_facility", Weight: 1}
 
 		if node.Name == "" {
 			node.Name = id
@@ -129,6 +135,8 @@ func (p Service) Build(ctx context.Context, region logistics.Region) (logistics.
 	if err := connect(ctx, &g, dataset.Tracks, p.Policy.MaximumSnapKM); err != nil {
 		return g, err
 	}
+
+	condense(&g, policy.MaximumNodes)
 
 	CalculateMetrics(&g)
 

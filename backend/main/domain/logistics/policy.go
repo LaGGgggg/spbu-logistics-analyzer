@@ -7,21 +7,61 @@ import (
 	"unicode"
 )
 
+// MaximumOptimization is the strictest filtering level: only confirmed freight
+// facilities survive, which is the behaviour of the analyzer before the
+// optimization degree was introduced.
+const MaximumOptimization = 100
+
 type FreightPolicy struct {
 	MaximumSnapKM float64 `json:"maximum_snap_km"`
+	Optimization  int     `json:"optimization"`
+
+	// MaximumNodes caps the graph size: when classification accepts more
+	// facilities, nearby clusters are condensed into single weighted nodes.
+	// Zero disables condensation.
+	MaximumNodes int `json:"maximum_nodes"`
 }
 
 func DefaultFreightPolicy() FreightPolicy {
-	return FreightPolicy{MaximumSnapKM: 1}
+	return FreightPolicy{MaximumSnapKM: 1, Optimization: MaximumOptimization, MaximumNodes: 500}
 }
 
 func (p FreightPolicy) Validate() error {
 
-	if !inRange(p.MaximumSnapKM, 0.001, 10) {
+	if !inRange(p.MaximumSnapKM, 0.001, 10) || !inRange(float64(p.Optimization), 0, MaximumOptimization) || !inRange(float64(p.MaximumNodes), 0, 1e6) {
 		return fmt.Errorf("invalid freight policy")
 	}
 
 	return nil
+}
+
+// maxTier maps the optimization degree linearly onto the candidate tiers:
+// degree 0 accepts every candidate, degree 51 and above only confirmed
+// freight facilities.
+func (p FreightPolicy) maxTier() int {
+	return (MaximumOptimization - p.Optimization) * 2 / MaximumOptimization
+}
+
+// candidateTier classifies a feature by the amount of evidence for its freight
+// role: 0 — confirmed freight facility, 1 — transport facility without cargo
+// confirmation, 2 — explicitly non-freight category.
+func candidateTier(t map[string]string) int {
+
+	if t["disused"] == "yes" || t["abandoned"] == "yes" || t["military"] != "" || t["railway"] == "subway" || t["station"] == "subway" || t["port"] == "fishing" || t["port"] == "roro" || t["leisure"] == "marina" {
+		return 2
+	}
+
+	cargo := t["freight"] == "yes" || (t["cargo"] != "" && t["cargo"] != "no" && t["cargo"] != "passengers")
+
+	if t["railway"] == "container_terminal" || t["industrial"] == "intermodal_freight_terminal" || (t["railway"] == "station" && cargo) || (t["railway"] == "yard" && (cargo || t["railway:yard:purpose"] == "intermodal" || t["railway:yard:purpose"] == "transloading")) {
+		return 0
+	}
+
+	if t["port"] == "cargo" || (cargo && (t["industrial"] == "port" || t["landuse"] == "port" || t["harbour"] == "yes")) {
+		return 0
+	}
+
+	return 1
 }
 
 // ESRKey matches physical stations by the first four digits. Service records
@@ -66,13 +106,12 @@ func FeatureIDs(f Feature) []ExternalID {
 func (p FreightPolicy) Classify(f Feature, references []Reference) (LogisticsNode, bool) {
 
 	t := f.Tags
-
-	if t["disused"] == "yes" || t["abandoned"] == "yes" || t["military"] != "" || t["railway"] == "subway" || t["station"] == "subway" || t["port"] == "fishing" || t["port"] == "roro" || t["leisure"] == "marina" {
-		return LogisticsNode{}, false
-	}
+	tier := candidateTier(t)
 
 	ids := FeatureIDs(f)
-	node := LogisticsNode{ID: string(f.ExternalID.Namespace) + ":" + f.ExternalID.Value, Name: t["name"], Coordinates: f.Coordinates, ExternalIDs: ids, Sources: []string{"osm"}}
+	node := LogisticsNode{ID: string(f.ExternalID.Namespace) + ":" + f.ExternalID.Value, Name: t["name"], Coordinates: f.Coordinates, ExternalIDs: ids, Sources: []string{"osm"}, Weight: 1}
+
+	referenceMatched := false
 
 	for _, ref := range references {
 		if !ref.Cargo {
@@ -93,6 +132,7 @@ func (p FreightPolicy) Classify(f Feature, references []Reference) (LogisticsNod
 			continue
 		}
 
+		referenceMatched = true
 		node.Modes = append(node.Modes, ref.Modes...)
 		node.ExternalIDs = append(node.ExternalIDs, ref.ExternalIDs...)
 		node.Sources = append(node.Sources, ref.Source)
@@ -116,21 +156,29 @@ func (p FreightPolicy) Classify(f Feature, references []Reference) (LogisticsNod
 	port := t["port"] == "cargo" || (cargo && (t["industrial"] == "port" || t["landuse"] == "port" || t["harbour"] == "yes"))
 
 	if port {
-		mode := TransportSea
-
-		if t["port:type"] == "inland_port" {
-			mode = TransportRiver
-		}
-
-		if t["port:type"] == "dryport" {
-			mode = TransportRail
-		}
-
-		node.Modes = append(node.Modes, mode)
+		node.Modes = append(node.Modes, portMode(t))
 		node.Kind = "port"
 	}
 
-	if len(node.Modes) == 0 {
+	if len(node.Modes) == 0 && p.maxTier() >= 1 {
+		if t["railway"] != "" && t["railway"] != "rail" {
+			node.Modes = append(node.Modes, TransportRail)
+		}
+
+		if t["industrial"] == "port" || t["landuse"] == "port" || t["harbour"] == "yes" || (t["port"] != "" && t["port"] != "cargo") {
+			node.Modes = append(node.Modes, portMode(t))
+
+			if node.Kind == "" {
+				node.Kind = "port"
+			}
+		}
+	}
+
+	if referenceMatched {
+		tier = 0
+	}
+
+	if len(node.Modes) == 0 || tier > p.maxTier() {
 		return LogisticsNode{}, false
 	}
 
@@ -154,4 +202,17 @@ func (p FreightPolicy) Classify(f Feature, references []Reference) (LogisticsNod
 	node.Cargo = t["cargo"]
 
 	return node, true
+}
+
+func portMode(t map[string]string) TransportMode {
+
+	if t["port:type"] == "inland_port" {
+		return TransportRiver
+	}
+
+	if t["port:type"] == "dryport" {
+		return TransportRail
+	}
+
+	return TransportSea
 }

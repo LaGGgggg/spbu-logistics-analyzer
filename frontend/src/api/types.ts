@@ -13,6 +13,7 @@ export type LogisticsNode = {
     external_ids: { namespace: string; value: string }[] | null
     kind?: string
     cargo?: string
+    weight?: number
 }
 
 export type LogisticsEdge = {

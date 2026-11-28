@@ -14,7 +14,12 @@ info:
     пересборки в текущем API нет. Задачу можно отменить отдельным запросом;
     закрытие браузера само по себе её не отменяет.
     При остановке backend processing-задача может вернуться в pending.
-    Авторизация в текущей реализации отсутствует.
+
+    Запуск построения и отмена задачи требуют авторизации через cookie-сессию:
+    зарегистрируйтесь или войдите через /api/auth/register или /api/auth/login —
+    ответ устанавливает HttpOnly cookie magistral_session сроком на 7 дней.
+    Чтение регионов, задач, графов и экспорт остаются публичными.
+    Неавторизованный запрос к защищённой операции возвращает 401.
 servers:
   - url: http://localhost:8080
     description: Локальный Go backend
@@ -24,6 +29,8 @@ security: []
 tags:
   - name: Service
     description: Проверка процесса и машиночитаемый контракт
+  - name: Auth
+    description: Регистрация, вход и сессия
   - name: Regions
     description: Сохранённые пресеты областей
   - name: Graphs
@@ -61,6 +68,126 @@ paths:
             application/yaml:
               schema:
                 type: string
+  /api/auth/register:
+    post:
+      operationId: register
+      tags: [Auth]
+      summary: Зарегистрироваться и открыть сессию
+      description: |
+        Создаёт аккаунт и сразу устанавливает cookie сессии. Email
+        нормализуется (нижний регистр, обрезка пробелов), пароль хранится в
+        виде bcrypt-хэша и никогда не возвращается. Тело — не более 4096 байт,
+        неизвестные поля отклоняются.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Credentials'
+      responses:
+        '201':
+          description: Аккаунт создан, сессия открыта
+          headers:
+            Set-Cookie:
+              schema: {type: string}
+              description: HttpOnly cookie magistral_session со сроком 7 дней
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUser'
+        '400':
+          description: Некорректный email или пароль короче 8 символов
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example: {error: 'Некорректный email или пароль (минимум 8 символов).'}
+        '409':
+          description: Email уже зарегистрирован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example: {error: 'Этот email уже зарегистрирован.'}
+  /api/auth/login:
+    post:
+      operationId: login
+      tags: [Auth]
+      summary: Войти и открыть сессию
+      description: |
+        Проверает пароль по bcrypt-хэшу и устанавливает cookie сессии.
+        Неизвестный email и неверный пароль отвечают одинаково, чтобы не
+        раскрывать существование аккаунтов. Неудачные попытки пишутся в аудит.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Credentials'
+      responses:
+        '200':
+          description: Сессия открыта
+          headers:
+            Set-Cookie:
+              schema: {type: string}
+              description: HttpOnly cookie magistral_session со сроком 7 дней
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUser'
+        '400':
+          description: Тело запроса некорректно
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example: {error: 'Укажите email и пароль.'}
+        '401':
+          description: Неверный email или пароль
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example: {error: 'Неверный email или пароль.'}
+  /api/auth/me:
+    get:
+      operationId: currentUser
+      tags: [Auth]
+      summary: Текущий пользователь
+      description: Возвращает пользователя по cookie сессии; 401, если сессии нет или она истекла.
+      responses:
+        '200':
+          description: Пользователь авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUser'
+        '401':
+          description: Требуется авторизация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example: {error: 'Требуется авторизация.'}
+  /api/auth/logout:
+    post:
+      operationId: logout
+      tags: [Auth]
+      summary: Закрыть сессию
+      description: |
+        Удаляет сессию на сервере и очищает cookie. Идемпотентен — без сессии
+        тоже отвечает 200.
+      responses:
+        '200':
+          description: Сессия закрыта
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: {type: string}
+              example: {status: ok}
   /api/regions:
     get:
       operationId: listRegions
@@ -145,6 +272,8 @@ paths:
                 id: '$response.body#/job_id'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           description: Пресет region_id не найден
           content:
@@ -247,6 +376,8 @@ paths:
                 updated_at: '2026-11-02T12:01:00Z'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
@@ -432,6 +563,13 @@ components:
           schema:
             $ref: '#/components/schemas/Error'
           example: {error: 'Регион, задача или граф не найдены.'}
+    Unauthorized:
+      description: Нет сессии или она истекла; войдите через /api/auth/login
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example: {error: 'Требуется авторизация.'}
     InternalError:
       description: Внутренняя ошибка операции с хранилищем
       content:
@@ -440,6 +578,20 @@ components:
             $ref: '#/components/schemas/Error'
           example: {error: Ошибка хранилища. Повторите запрос позже.}
   schemas:
+    Credentials:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email: {type: string, format: email, maxLength: 254}
+        password: {type: string, minLength: 8, maxLength: 72}
+    AuthUser:
+      type: object
+      required: [id, email, name]
+      properties:
+        id: {type: string}
+        email: {type: string, format: email}
+        name: {type: string}
     NonEmptyText:
       type: string
       minLength: 1
@@ -512,6 +664,16 @@ components:
         region_id:
           type: 'null'
           description: Необязательное null эквивалентно отсутствию поля.
+        optimization:
+          type: [integer, 'null']
+          minimum: 0
+          maximum: 100
+          description: |
+            Степень оптимизации отбора узлов, линейно смягчает или ужесточает
+            грузовую политику: 0 — принимаются все транспортные объекты,
+            51–100 — только подтверждённые грузовые (поведение по умолчанию).
+            Отсутствие поля эквивалентно значению по умолчанию. Уровень входит
+            в идентичность области, поэтому разные уровни не дедуплицируются.
     ReadyBuild:
       type: object
       required: [graph_id]
@@ -594,6 +756,13 @@ components:
             $ref: '#/components/schemas/ExternalID'
         kind: {type: string}
         cargo: {type: string}
+        weight:
+          type: integer
+          minimum: 1
+          description: |
+            Сколько исходных объектов объединено в этот узел конденсацией графа.
+            Отсутствует у обычных узлов (эквивалентно 1); чем больше вес,
+            тем крупнее маркер на карте.
         page_rank: {type: number}
         betweenness: {type: number}
         closeness: {type: number}

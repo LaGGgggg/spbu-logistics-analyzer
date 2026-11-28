@@ -4,16 +4,13 @@ import { MapContainer, TileLayer, GeoJSON, ScaleControl, Rectangle, Pane } from 
 import { FitToRegion } from './FitToRegion'
 import { RegionsLayer } from './RegionsLayer'
 import { BBoxDrawer, type BBox } from './BBoxDrawer'
-import { useMemo } from 'react'
-import type { Coordinates, LogisticsGraph, TransportMode } from '@/api/types'
+import type { Coordinates, LogisticsEdge, LogisticsGraph, LogisticsNode } from '@/api/types'
 import { GraphNodes } from './GraphNodes'
 import { FitToNodes } from './FitToNodes'
 import { GraphEdges } from './GraphEdges'
-import { UNKNOWN_KIND } from '@/lib/kinds'
 import type { Place } from '@/api/geocode'
 import { MapResizer } from './MapResizer'
 import { PanToPoint } from './PanToPoint'
-import { uniqueConnections } from '@/lib/connections'
 
 
 
@@ -31,9 +28,8 @@ type MapViewProps = {
     onDrawn?: (bbox: BBox) => void
     onDrawCancel?: () => void
     graph?: LogisticsGraph | null
-    visibleModes?: Set<TransportMode>
-    hiddenKinds?: Set<string>
-    showEdges?: boolean
+    nodes?: LogisticsNode[]
+    edges?: LogisticsEdge[]
     onSelectPlace?: (p: Place) => void
     selectedNodeId?: string | null
     onSelectNode?: (id: string) => void
@@ -47,9 +43,8 @@ export function MapView({
     region,
     bbox,
     graph,
-    visibleModes,
-    hiddenKinds,
-    showEdges = true,
+    nodes = [],
+    edges = [],
     drawMode = false,
     building = false,
     onDrawn = () => { },
@@ -59,28 +54,6 @@ export function MapView({
     onSelectNode,
     focusPoint = null,
 }: MapViewProps) {
-
-
-    const visibleNodes = useMemo(() => {
-        if (!graph) return []
-        return graph.nodes.filter((n) => {
-            const modeOk = !visibleModes || n.modes.some((m) => visibleModes.has(m))
-            const kindOk = !hiddenKinds || !hiddenKinds.has(n.kind ?? UNKNOWN_KIND)
-            return modeOk && kindOk
-        })
-    }, [graph, visibleModes, hiddenKinds])
-
-
-    const visibleEdges = useMemo(() => {
-        if (!graph || !showEdges) return []
-
-        const visibleIds = new Set(visibleNodes.map((n) => n.id))
-        return uniqueConnections(graph.edges.filter((e) =>
-            (!visibleModes || visibleModes.has(e.mode)) &&
-            visibleIds.has(e.from_node_id) &&
-            visibleIds.has(e.to_node_id),
-        ))
-    }, [graph, showEdges, visibleModes, visibleNodes])
 
 
     return (
@@ -114,8 +87,8 @@ export function MapView({
 
             {graph && <FitToNodes nodes={graph.nodes} />}
             <Pane name="graph" style={{ zIndex: 450 }}>
-                <GraphEdges edges={visibleEdges} />
-                <GraphNodes nodes={visibleNodes} selectedId={selectedNodeId} onSelect={onSelectNode} />
+                <GraphEdges edges={edges} />
+                <GraphNodes nodes={nodes} selectedId={selectedNodeId} onSelect={onSelectNode} />
             </Pane>
 
 

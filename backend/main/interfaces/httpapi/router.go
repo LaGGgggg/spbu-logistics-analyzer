@@ -17,10 +17,24 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewRouter(service logistics_service.Queries) *gin.Engine {
+func NewRouter(service logistics_service.Queries, auth AuthQueries, options AuthOptions) *gin.Engine {
 
 	router := gin.New()
 	router.Use(gin.Logger(), gin.Recovery())
+
+	registerAuthRoutes(router, auth, options)
+
+	requireAuth := func(c *gin.Context) {
+		if _, err := auth.Current(c.Request.Context(), sessionID(c)); err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация."})
+			c.Abort()
+
+			return
+		}
+
+		c.Next()
+	}
+
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "healthy", "service": "Logistics Network API"})
 	})
@@ -35,13 +49,14 @@ func NewRouter(service logistics_service.Queries) *gin.Engine {
 
 		c.JSON(http.StatusOK, regions)
 	})
-	router.POST("/api/graphs", func(c *gin.Context) {
+	router.POST("/api/graphs", requireAuth, func(c *gin.Context) {
 		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 4096)
 		decoder := json.NewDecoder(c.Request.Body)
 		decoder.DisallowUnknownFields()
 		var request struct {
-			RegionID *string `json:"region_id"`
-			Bounds   *struct {
+			RegionID     *string `json:"region_id"`
+			Optimization *int    `json:"optimization"`
+			Bounds       *struct {
 				West  *float64 `json:"west"`
 				South *float64 `json:"south"`
 				East  *float64 `json:"east"`
@@ -57,6 +72,12 @@ func NewRouter(service logistics_service.Queries) *gin.Engine {
 
 		if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) || (request.RegionID == nil) == (request.Bounds == nil) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Укажите только region_id или bounds с четырьмя координатами."})
+
+			return
+		}
+
+		if request.Optimization != nil && (*request.Optimization < 0 || *request.Optimization > logistics.MaximumOptimization) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Оптимизация должна быть от 0 до 100."})
 
 			return
 		}
@@ -81,7 +102,7 @@ func NewRouter(service logistics_service.Queries) *gin.Engine {
 				return
 			}
 
-			result, err = service.RequestAreaBuild(c.Request.Context(), bounds)
+			result, err = service.RequestAreaBuild(c.Request.Context(), bounds, request.Optimization)
 		} else {
 			id := *request.RegionID
 
@@ -117,7 +138,7 @@ func NewRouter(service logistics_service.Queries) *gin.Engine {
 
 		c.JSON(http.StatusOK, job)
 	})
-	router.POST("/api/jobs/:id/cancel", func(c *gin.Context) {
+	router.POST("/api/jobs/:id/cancel", requireAuth, func(c *gin.Context) {
 		job, err := service.CancelJob(c.Request.Context(), c.Param("id"))
 
 		if err != nil {

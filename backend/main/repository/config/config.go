@@ -11,20 +11,24 @@ import (
 )
 
 type Config struct {
-	DatabaseURL  string
-	HTTPAddr     string
-	Workers      int
-	BuildTimeout time.Duration
-	SourcesFile  string
-	Regions      []logistics.Region
+	DatabaseURL   string
+	HTTPAddr      string
+	Workers       int
+	BuildTimeout  time.Duration
+	SourcesFile   string
+	Regions       []logistics.Region
+	SecureCookies bool
+	CookieDomain  string
 }
 
 func Load() (Config, error) {
 
 	result := Config{
-		DatabaseURL: value("DATABASE_URL", "postgres://logistics:logistics@localhost:5432/logistics?sslmode=disable"),
-		HTTPAddr:    value("HTTP_ADDR", ":8080"),
-		SourcesFile: value("SOURCES_FILE", "configs/sources.json"),
+		DatabaseURL:   value("DATABASE_URL", "postgres://logistics:logistics@localhost:5432/logistics?sslmode=disable"),
+		HTTPAddr:      value("HTTP_ADDR", ":8080"),
+		SourcesFile:   value("SOURCES_FILE", "configs/sources.json"),
+		CookieDomain:  value("COOKIE_DOMAIN", ""),
+		SecureCookies: value("SECURE_COOKIES", "") == "true",
 	}
 
 	var err error

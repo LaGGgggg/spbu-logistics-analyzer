@@ -27,11 +27,11 @@ async function waitForJob(jobId: string, signal: AbortSignal): Promise<Job> {
     }
 }
 
-export async function buildGraph(bounds: Bounds, signal: AbortSignal, onJob?: (jobId: string) => void): Promise<string> {
+export async function buildGraph(bounds: Bounds, optimization: number, signal: AbortSignal, onJob?: (jobId: string) => void): Promise<string> {
     for (let attempt = 1; ; attempt++) {
         const startedAt = Date.now()
         const res = await apiClient.post<{ graph_id?: string; job_id?: string }>(
-            '/graphs', { bounds }, { signal }
+            '/graphs', { bounds, optimization }, { signal }
         )
 
         if (res.status === 200 && res.data.graph_id) return res.data.graph_id

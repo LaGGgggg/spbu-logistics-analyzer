@@ -33,13 +33,13 @@ func TestAreaIdentityIncludesBoundsAndSource(t *testing.T) {
 	resolver := &areaResolver{version: "v1"}
 	s := logistics_service.NewService(repo, resolver)
 	bounds := logistics.Bounds{West: 29, South: 59, East: 31, North: 61}
-	first, err := s.RequestAreaBuild(context.Background(), bounds)
+	first, err := s.RequestAreaBuild(context.Background(), bounds, nil)
 
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	same, err := s.RequestAreaBuild(context.Background(), bounds)
+	same, err := s.RequestAreaBuild(context.Background(), bounds, nil)
 
 	if err != nil {
 		t.Fatal(err)
@@ -50,7 +50,7 @@ func TestAreaIdentityIncludesBoundsAndSource(t *testing.T) {
 	}
 
 	bounds.East = 30.5
-	other, err := s.RequestAreaBuild(context.Background(), bounds)
+	other, err := s.RequestAreaBuild(context.Background(), bounds, nil)
 
 	if err != nil {
 		t.Fatal(err)
@@ -61,7 +61,7 @@ func TestAreaIdentityIncludesBoundsAndSource(t *testing.T) {
 	}
 
 	resolver.version = "v2"
-	updated, err := s.RequestAreaBuild(context.Background(), bounds)
+	updated, err := s.RequestAreaBuild(context.Background(), bounds, nil)
 
 	if err != nil {
 		t.Fatal(err)
@@ -71,11 +71,27 @@ func TestAreaIdentityIncludesBoundsAndSource(t *testing.T) {
 		t.Fatal("source versions share cache identity")
 	}
 
-	if _, err := s.RequestAreaBuild(context.Background(), logistics.Bounds{}); !errors.Is(err, logistics_service.ErrInvalidInput) {
+	loose := 0
+	tuned, err := s.RequestAreaBuild(context.Background(), bounds, &loose)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if tuned.Region.ID == updated.Region.ID || tuned.Region.Optimization == nil || *tuned.Region.Optimization != 0 {
+		t.Fatal("optimization degree missing from area identity")
+	}
+
+	if _, err := s.RequestAreaBuild(context.Background(), logistics.Bounds{}, nil); !errors.Is(err, logistics_service.ErrInvalidInput) {
 		t.Fatalf("invalid bounds: %v", err)
 	}
 
-	if _, err := logistics_service.NewService(repo).RequestAreaBuild(context.Background(), bounds); !errors.Is(err, logistics_service.ErrAreaUnavailable) {
+	invalid := 101
+	if _, err := s.RequestAreaBuild(context.Background(), bounds, &invalid); !errors.Is(err, logistics_service.ErrInvalidInput) {
+		t.Fatalf("invalid optimization: %v", err)
+	}
+
+	if _, err := logistics_service.NewService(repo).RequestAreaBuild(context.Background(), bounds, nil); !errors.Is(err, logistics_service.ErrAreaUnavailable) {
 		t.Fatalf("missing resolver: %v", err)
 	}
 }

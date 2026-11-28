@@ -1,7 +1,8 @@
 {
   "maximum_objects": 5000000,
   "policy": {
-    "maximum_snap_km": 0.5
+    "maximum_snap_km": 0.5,
+    "maximum_nodes": 500
   },
   "regions": {
     "spb-leningrad": {
