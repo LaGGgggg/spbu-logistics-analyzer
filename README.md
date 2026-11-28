@@ -104,12 +104,12 @@ cd frontend && npm run lint && npm run build
 ## Структура репозитория
 
 ```
-backend/       Go-модуль: backend/main — код, конфиги, миграции; backend/tests — тесты
-frontend/      React-приложение
-docs/          Документация по архитектуре
-openapi.yaml   Спецификация HTTP API
-compose.yml    PostgreSQL для локального запуска
-.github/       CI backend
+backend/             Go-модуль: backend/main — код, конфиги, миграции; backend/tests — тесты
+frontend/            React-приложение
+docs/                Документация по архитектуре
+openapi.yaml         Спецификация HTTP API
+docker-compose.yml   PostgreSQL для локального запуска backend-а
+.github/             CI
 ```
 
 ## Текущие ограничения
